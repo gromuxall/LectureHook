@@ -30,6 +30,7 @@ prefs.update(moreprefs)
 chrome_options.add_experimental_option("prefs", prefs)
 driver = webdriver.Chrome(config['DRIVER']['path'], options=chrome_options)
 
+os.chdir(config['DOWNLOAD']['path'])
 
 # getToMyCourses ----------------------------------------//
 #   traverses the Blackboard menu to find course list,
@@ -95,15 +96,12 @@ def switchToFrame():
 # end switchToFrame()
 
 
-
 # appendFileName ----------------------------------------//
 #    because files may finish downloading out of order,
 #    this will search for a currently downloading file
 #    and append to list before another starts downloading
 # -------------------------------------------------------//
 def appendFileName(cr_list):
-    os.chdir(config['DOWNLOAD']['path'])
-    
     dwnld_ext = 'crdownload'
     all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
     
@@ -130,7 +128,6 @@ def downloadCaptures(csv_num, cr_list):
     num_lec = len(media_capture) - csv_num
     
     if num_lec > 0:
-
         media_capture[csv_num].click()
         
         WebDriverWait(driver,20).until(
@@ -167,16 +164,15 @@ def downloadCaptures(csv_num, cr_list):
 #    indicates that a file is still downloading and
 #    sleeps if so
 # -------------------------------------------------------//
-def waitForDownload(cr_list):
+def waitForDownload(start_num, cr_list):
     dwnld_ext = 'crdownload'
     video_ext = 'mp4'
     crs = config['CODE']['code1'] + config['COURSE_NUM']['course_num1'] + 'lec'
 
-    os.chdir(config['DOWNLOAD']['path'])
     all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
 
     while len(all_filenames) > 0:
-        print('Still downloading...')
+        print('Downloads in progress...')
 
         time.sleep(5)
         all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
@@ -184,15 +180,10 @@ def waitForDownload(cr_list):
     print('All files downloaded')
     
     all_filenames = [i for i in glob.glob('hd*.{}'.format(video_ext))]
-    
-    for i in range(0, len(all_filenames)):
-        print(all_filenames[i])
-
-    for i in cr_list:
-        print(i)
 
     for i in range(0, len(cr_list)):
-        os.rename(cr_list[i], str(crs + f'{i+1:02}' + '.' + video_ext))
+        crs_str = str(crs + f'{(i + start_num + 1):02}' + '.' + video_ext)
+        os.rename(cr_list[i], crs_str) 
 # end waitForDownload()
 
 
@@ -200,22 +191,11 @@ def waitForDownload(cr_list):
 # - main() ----------------------------------------------//
 
 cr_list = list()
-
-# TODO: check download path and check number of lecture downloads
-    # send that number to downloadCaptures(num)
+curr_lecs = len([i for i in glob.glob('*.{}'.format('mp4'))])
 
 getToMyCourses()
 getToLectureCapture()
-
-# TODO: check download path and check number of lecture downloads
-    # send that number to downloadCaptures(num)
-
 switchToFrame()
-downloadCaptures(0, cr_list)
-waitForDownload(cr_list)
-
-    # Not sure if I need the dates, but here is how to grab them
-    #date_capture = driver.find_elements_by_xpath("//span[@class='date']")
-    #for d in date_capture:
-    #    print(d.get_attribute('innerHTML'))
+downloadCaptures(curr_lecs, cr_list)
+waitForDownload(curr_lecs, cr_list)
 
