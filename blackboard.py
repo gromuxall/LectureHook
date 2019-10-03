@@ -24,13 +24,12 @@ chrome_options = Options()
     # set browser to allow multiple simultaneous downloads
 prefs = {'profile.default_content_setting_values.automatic_downloads': 1}
     # set download path
-moreprefs = {"download.default_directory": config['DOWNLOAD']['path']}
+moreprefs = {"download.default_directory": config['PATHS']['dwn1']}
 
 prefs.update(moreprefs)
 chrome_options.add_experimental_option("prefs", prefs)
-driver = webdriver.Chrome(config['DRIVER']['path'], options=chrome_options)
+driver = webdriver.Chrome(config['PATHS']['driver'], options=chrome_options)
 
-os.chdir(config['DOWNLOAD']['path'])
 
 # getToMyCourses ----------------------------------------//
 #   traverses the Blackboard menu to find course list,
@@ -67,7 +66,7 @@ def getToMyCourses():
 #    traverses and loads the lecture capture page
 # -------------------------------------------------------//
 def getToLectureCapture():
-    crs = str(config['CODE']['code1'] + " " + config['COURSE_NUM']['course_num1'])
+    crs = str(config['CODE']['code1'] + " " + config['NUM']['num1'])
     
     course = WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '" + crs + "')]")))
@@ -166,7 +165,7 @@ def downloadCaptures(csv_num, cr_list):
 def waitForDownload(start_num, cr_list):
     dwnld_ext = 'crdownload'
     video_ext = 'mp4'
-    crs = config['CODE']['code1'] + config['COURSE_NUM']['course_num1'] + 'lec'
+    crs = config['CODE']['code1'] + config['NUM']['num1'] + 'lec'
 
     all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
 
@@ -186,7 +185,7 @@ def waitForDownload(start_num, cr_list):
 #    sleeps if so
 # -------------------------------------------------------//
 def renameFiles(start_num, cr_list):
-    crs = config['CODE']['code1'] + config['COURSE_NUM']['course_num1'] + 'lec'
+    crs = config['CODE']['code1'] + config['NUM']['num1'] + 'lec'
 
     for i in range(0, len(cr_list)):
         crs_str = str(crs + f'{(i + start_num + 1):02}' + '.mp4')
@@ -199,6 +198,7 @@ def renameFiles(start_num, cr_list):
 
 # - main() ----------------------------------------------//
 
+os.chdir(config['PATHS']['dwn1'])
 cr_list = list()
 curr_lecs = len([i for i in glob.glob('*.{}'.format('mp4'))])
 
