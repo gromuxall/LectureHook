@@ -109,7 +109,6 @@ def appendFileName(cr_list):
         newf = f.split('.crdownload')[0]
         if newf not in cr_list:
             cr_list.append(newf)
-            print('Appended: ' + newf)
 
 
 # downloadCaptures --------------------------------------//
@@ -159,7 +158,7 @@ def downloadCaptures(csv_num, cr_list):
 # end downloadCaptures()
 
 
-# wait_for_download -------------------------------------//
+# waitForDownload -------------------------------------//
 #    checks for files with extension .crdownload, which
 #    indicates that a file is still downloading and
 #    sleeps if so
@@ -178,14 +177,24 @@ def waitForDownload(start_num, cr_list):
         all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
 
     print('All files downloaded')
-    
-    all_filenames = [i for i in glob.glob('hd*.{}'.format(video_ext))]
-
-    for i in range(0, len(cr_list)):
-        crs_str = str(crs + f'{(i + start_num + 1):02}' + '.' + video_ext)
-        os.rename(cr_list[i], crs_str) 
 # end waitForDownload()
 
+
+# wait_for_download -------------------------------------//
+#    checks for files with extension .crdownload, which
+#    indicates that a file is still downloading and
+#    sleeps if so
+# -------------------------------------------------------//
+def renameFiles(start_num, cr_list):
+    crs = config['CODE']['code1'] + config['COURSE_NUM']['course_num1'] + 'lec'
+
+    for i in range(0, len(cr_list)):
+        crs_str = str(crs + f'{(i + start_num + 1):02}' + '.mp4')
+        os.rename(cr_list[i], crs_str) 
+
+    print('All files renamed')
+# end renameFiles()
+    
 
 
 # - main() ----------------------------------------------//
@@ -198,4 +207,5 @@ getToLectureCapture()
 switchToFrame()
 downloadCaptures(curr_lecs, cr_list)
 waitForDownload(curr_lecs, cr_list)
+renameFiles(curr_lecs, cr_list)
 
