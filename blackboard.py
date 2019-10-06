@@ -19,16 +19,6 @@ import os, os.path, glob
 config = configparser.ConfigParser()
 config.read('courses.ini')
 
-# set options for chrome
-chrome_options = Options()
-    # set browser to allow multiple simultaneous downloads
-prefs = {'profile.default_content_setting_values.automatic_downloads': 1}
-    # set download path
-moreprefs = {"download.default_directory": config['PATHS']['dwn1']}
-
-prefs.update(moreprefs)
-chrome_options.add_experimental_option("prefs", prefs)
-driver = webdriver.Chrome(config['PATHS']['driver'], options=chrome_options)
 
 
 # getToMyCourses ----------------------------------------//
@@ -65,24 +55,38 @@ def getToMyCourses():
 # getTo341LectureCapture --------------------------------//
 #    traverses and loads the lecture capture page
 # -------------------------------------------------------//
-def getToLectureCapture():
-    crs = str(config['CODE']['code1'] + " " + config['NUM']['num1'])
-    
+def getToLectureCapture(i_num):
+    crs = str(config['CODE']['code' + str(i_num)] + " " + config['NUM']['num' + str(i_num)])
+       
+    # clicks link to specific course
     course = WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '" + crs + "')]")))
     course.click()
 
+    # changes frame
     iframe = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, "//iframe[@name='classic-learn-iframe']"))
         )
     driver.switch_to.frame(iframe)
 
+    # waits for side menu to appear
     WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "//ul[@id='courseMenuPalette_contents']/li/a")))
 
+    # clicks Lecture Capture link in side menu
     lec_cap_link = driver.find_element_by_xpath("//*[contains(text(), 'Lecture Capture')]")
-    lec_cap_link.click() 
+    lec_cap_link.click()
 # end getToLectureCapture()
+
+
+# timePage ----------------------------------------------//
+#    navigates through time page if present 
+# -------------------------------------------------------//
+def timePage(t):
+    course_time = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '" + t + "')]")))
+    course_time.click()
+# end timePage()
 
 
 # switchToFrame -----------------------------------------//
@@ -101,8 +105,7 @@ def switchToFrame():
 #    and append to list before another starts downloading
 # -------------------------------------------------------//
 def appendFileName(cr_list):
-    dwnld_ext = 'crdownload'
-    all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
+    all_filenames = [i for i in glob.glob('hd*.{}'.format('crdownload'))]
     
     for f in all_filenames:
         newf = f.split('.crdownload')[0]
@@ -115,7 +118,7 @@ def appendFileName(cr_list):
 #    capture and checks that number against the number
 #    of lectures available to download
 # -------------------------------------------------------//
-def downloadCaptures(csv_num, cr_list):
+def downloadCaptures(num, cr_list):
 
     # wait for elements to appear
     WebDriverWait(driver, 20).until(
@@ -123,10 +126,10 @@ def downloadCaptures(csv_num, cr_list):
    
     # extract buttons
     media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaInd')]")
-    num_lec = len(media_capture) - csv_num
+    num_lec = len(media_capture) - num
     
     if num_lec > 0:
-        media_capture[csv_num].click()
+        media_capture[num].click()
         
         WebDriverWait(driver,20).until(
             EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Download original')]")))
@@ -150,42 +153,35 @@ def downloadCaptures(csv_num, cr_list):
         time.sleep(2)
         appendFileName(cr_list)
 
-        print('[' + str(csv_num + 1) + '/' + str(len(media_capture)) + '] downloading')
+        print('[' + str(num + 1) + '/' + str(len(media_capture)) + '] downloading')
         
         # Recursive call to get next video
-        downloadCaptures(csv_num + 1, cr_list)
+        downloadCaptures(num + 1, cr_list)
 # end downloadCaptures()
 
 
-# waitForDownload -------------------------------------//
+# waitForDownload ---------------------------------------//
 #    checks for files with extension .crdownload, which
 #    indicates that a file is still downloading and
 #    sleeps if so
 # -------------------------------------------------------//
-def waitForDownload(start_num, cr_list):
-    dwnld_ext = 'crdownload'
-    video_ext = 'mp4'
-    crs = config['CODE']['code1'] + config['NUM']['num1'] + 'lec'
-
-    all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
+def waitForDownload(start_num, cr_list, i_num):
+    all_filenames = [i for i in glob.glob('hd*.{}'.format('crdownload'))]
 
     while len(all_filenames) > 0:
         print('Downloads in progress...')
-
         time.sleep(5)
-        all_filenames = [i for i in glob.glob('hd*.{}'.format(dwnld_ext))]
+        all_filenames = [i for i in glob.glob('hd*.{}'.format('crdownload'))]
 
     print('All files downloaded')
 # end waitForDownload()
 
 
-# wait_for_download -------------------------------------//
-#    checks for files with extension .crdownload, which
-#    indicates that a file is still downloading and
-#    sleeps if so
+# renameFiles -------------------------------------------//
+#    rename files based on generated course code and number
 # -------------------------------------------------------//
-def renameFiles(start_num, cr_list):
-    crs = config['CODE']['code1'] + config['NUM']['num1'] + 'lec'
+def renameFiles(start_num, cr_list, i_num):
+    crs = config['CODE']['code' + str(i_num)] + config['NUM']['num' + str(i_num)] + 'lec'
 
     for i in range(0, len(cr_list)):
         crs_str = str(crs + f'{(i + start_num + 1):02}' + '.mp4')
@@ -195,17 +191,70 @@ def renameFiles(start_num, cr_list):
 # end renameFiles()
     
 
+# wait_for_download -------------------------------------//
+#    checks for files with extension .crdownload, which
+#    indicates that a file is still downloading and
+#    sleeps if so
+# -------------------------------------------------------//
+def displayMenu():
+    i = 1
 
-# - main() ----------------------------------------------//
+    print("\n~-------------")
+    print("  Lecture Capture Scraper")
+    print("\n~-------------")
 
-os.chdir(config['PATHS']['dwn1'])
+    while config['NUM']['num' + str(i)]:
+        course = config['CODE']['code' + str(i)] + ' ' + config['NUM']['num' + str(i)]
+        print('(' + str(i) + ') ' + course)
+        i = i + 1
+    
+    print('Course choice: ', end=' ')
+    i_num = input()
+    print('Downloading lectures from ' + config['CODE']['code' + str(i_num)] + ' ' + config['NUM']['num' + str(i_num)])
+    return i_num
+# end displayMenu()
+
+
+# main() ------------------------------------------------//
+
+# display menu and get course choice
+i_num = displayMenu()
+
+# configure options for chrome
+chrome_options = Options()
+# set browser to allow multiple simultaneous downloads
+prefs = {'profile.default_content_setting_values.automatic_downloads': 1}
+# set download path
+moreprefs = {"download.default_directory": config['PATHS']['dwn' + str(i_num)]}
+prefs.update(moreprefs)
+chrome_options.add_experimental_option("prefs", prefs)
+
+# list of file names
 cr_list = list()
+
+# if a time for lecture captures must be specified
+course_time = config['TIME']['time' + str(i_num)]
+
+# launch webdriver
+driver = webdriver.Chrome(config['PATHS']['driver'], options=chrome_options)
+
+# change current working directory
+os.chdir(config['PATHS']['dwn' + str(i_num)])
+
+# check current number of lecture videos in folder
 curr_lecs = len([i for i in glob.glob('*.{}'.format('mp4'))])
 
+print("Downloading to " + os.getcwd())
+
 getToMyCourses()
-getToLectureCapture()
+getToLectureCapture(i_num)
+
+if course_time:
+    timePage(course_time)
+
 switchToFrame()
 downloadCaptures(curr_lecs, cr_list)
-waitForDownload(curr_lecs, cr_list)
-renameFiles(curr_lecs, cr_list)
+waitForDownload(curr_lecs, cr_list, i_num)
+renameFiles(curr_lecs, cr_list, i_num)
 
+driver.quit()
