@@ -197,19 +197,25 @@ def renameFiles(start_num, cr_list, i_num):
 #    sleeps if so
 # -------------------------------------------------------//
 def displayMenu():
-    i = 1
-
-    print("\n~-------------")
+    print("\n~-------------------------~")
     print("  Lecture Capture Scraper")
-    print("\n~-------------")
-
-    while config['NUM']['num' + str(i)]:
-        course = config['CODE']['code' + str(i)] + ' ' + config['NUM']['num' + str(i)]
-        print('(' + str(i) + ') ' + course)
-        i = i + 1
+    print("~-------------------------~\n")
     
-    print('Course choice: ', end=' ')
-    i_num = input()
+    while True:
+        i = 1
+        
+        while config['NUM']['num' + str(i)]:
+            course = config['CODE']['code' + str(i)] + ' ' + config['NUM']['num' + str(i)]
+            print('(' + str(i) + ') ' + course)
+            i = i + 1
+        print('\nCourse choice:', end=' ')
+        i_num = input()
+        
+        if (not i_num.isdigit()) or int(i_num) < 1 or int(i_num) > i:
+            print('Invalid Input')
+        else:
+            break
+
     print('Downloading lectures from ' + config['CODE']['code' + str(i_num)] + ' ' + config['NUM']['num' + str(i_num)])
     return i_num
 # end displayMenu()
@@ -244,7 +250,7 @@ os.chdir(config['PATHS']['dwn' + str(i_num)])
 # check current number of lecture videos in folder
 curr_lecs = len([i for i in glob.glob('*.{}'.format('mp4'))])
 
-print("Downloading to " + os.getcwd())
+print("to >> " + os.getcwd())
 
 getToMyCourses()
 getToLectureCapture(i_num)
