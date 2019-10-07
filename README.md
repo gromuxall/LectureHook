@@ -59,3 +59,16 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     ```sh
     $ python3 lecturehook.py
     ```
+
+## FAQ
+- Will this work on Windows?
+
+    I don't know.
+
+- Will this work for a different school?
+
+    I don't know.
+
+- Why have you been doing this instead of your homework that is due soon?
+
+    I don't know.
