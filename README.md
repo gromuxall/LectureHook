@@ -12,8 +12,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 
 - Python version 3.4 or later
 - Selenium
-
-Install Selenium through the pip package manager
+    Install Selenium through the pip package manager
     ```sh
     $ pip install selenium
     ```
