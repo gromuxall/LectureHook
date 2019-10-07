@@ -14,6 +14,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     + extract and move chromedriver to a permanent location
 
 - Selenium
+    
     Install Selenium through the pip package manager
     ```sh
     $ pip install selenium
