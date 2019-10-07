@@ -1,8 +1,10 @@
 # -------------------------------------------------------//
 #
-#   < blackboard.py >
+#   lecturehook.py
 #
-#   > Download lecture capture from Blackboard
+#   Steven Madonna <smadon3@uic.edu>
+#
+#   > Download lecture captures from Blackboard
 #
 # -------------------------------------------------------//
 from selenium import webdriver
@@ -12,9 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
-import configparser, schedule, time, datetime, csv
-import os, os.path, glob
-
+import configparser, time, os, os.path, glob
 
 
 # getToMyCourses ----------------------------------------//
@@ -129,7 +129,7 @@ def downloadCaptures(num, cr_list):
         WebDriverWait(driver,20).until(
             EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Download original')]")))
         
-        # Needs half a second or it hits view occasionally
+        # Needs a second or it hits view occasionally
         time.sleep(1)
 
         (driver.find_element_by_xpath("//*[contains(text(), 'Download original')]")).click()
@@ -144,7 +144,7 @@ def downloadCaptures(num, cr_list):
         # click download button
         (driver.find_element_by_xpath("//a[@class='btn primary medium downloadBtn']")).click()
         
-        # Needs a second to establish this download as created before the other
+        # Needs two seconds to establish this download as created before the other
         time.sleep(2)
         appendFileName(cr_list)
 
