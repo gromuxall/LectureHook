@@ -10,7 +10,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 
 - Chrome WebDriver for your version of Chrome
 
-    + download it here: https://chromedriver.chromium.org/downloads
+    + [link](https://chromedriver.chromium.org/downloads "Download it here")
     + extract and move chromedriver to a permanent location
 
 - Selenium
@@ -20,4 +20,12 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     ```
 
 ## Usage
-
+1. Fill out included config file
+    ```sh
+    [PATHS]
+    driver = /full/path/to/chromedriver
+    dwn1 = /full/path/to/course/lectures/folder
+    ```
+    - 
+    -
+2. 
