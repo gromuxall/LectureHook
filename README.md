@@ -4,11 +4,11 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 
 # Installation
 
-This script requires some dependencies, and I am hoping to have a dependency script up soon. Until then, the required need to be installed:
-
-- Chrome
-- Python 3+
+- Chrome browser
+- Chrome WebDriver for your version of Chrome:
+    https://chromedriver.chromium.org/downloads
+- Python3
 - Selenium
-- python time
-- python configparser
-- python os, os.path, glob
+```sh
+$ pip install selenium
+```
