@@ -21,7 +21,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     ```
 
 ## Usage
-1. Fill out included config file
+1. Fill out included config file. 
     ```sh
     [SITE]
     site = https://uic.blackboard.com
@@ -32,8 +32,8 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 
     [PATHS]
     driver = /home/full/path/to/chromedriver
-    dwn1 = /home/full/path/to/course1/lectures/folder
-    dwn2 = /home/full/path/to/course2/lectures/folder
+    dwn1 = /home/full/path/to/course1/lectures
+    dwn2 = /home/full/path/to/course2/lectures
     ...
     
     [CODE]
@@ -51,4 +51,11 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     time2 = 11am
     ...
     ```
-2. 
+2. Make lecturehook.py executable
+    ```sh
+    $ chmod +x lecturehook.py
+    ```
+3. Run in your terminal
+    ```sh
+    $ python3 lecturehook.py
+    ```
