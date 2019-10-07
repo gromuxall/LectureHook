@@ -15,15 +15,10 @@ from selenium.webdriver.common.keys import Keys
 import configparser, schedule, time, datetime, csv
 import os, os.path, glob
 
-# import config file
-config = configparser.ConfigParser()
-config.read('courses.ini')
-
 
 
 # getToMyCourses ----------------------------------------//
-#   traverses the Blackboard menu to find course list,
-#     and then clicking chosen course
+#   traverses the Blackboard menu to find course list
 # -------------------------------------------------------//
 def getToMyCourses():
     # Initial get of origin page
@@ -52,7 +47,7 @@ def getToMyCourses():
 # end getToMyCourses()
 
 
-# getTo341LectureCapture --------------------------------//
+# getToLectureCapture -----------------------------------//
 #    traverses and loads the lecture capture page
 # -------------------------------------------------------//
 def getToLectureCapture(i_num):
@@ -178,7 +173,7 @@ def waitForDownload(start_num, cr_list, i_num):
 
 
 # renameFiles -------------------------------------------//
-#    rename files based on generated course code and number
+#    rename files based on course code and number
 # -------------------------------------------------------//
 def renameFiles(start_num, cr_list, i_num):
     crs = config['CODE']['code' + str(i_num)] + config['NUM']['num' + str(i_num)] + 'lec'
@@ -191,10 +186,9 @@ def renameFiles(start_num, cr_list, i_num):
 # end renameFiles()
     
 
-# wait_for_download -------------------------------------//
-#    checks for files with extension .crdownload, which
-#    indicates that a file is still downloading and
-#    sleeps if so
+# displayMenu -------------------------------------------//
+#    displays courses from config file, does some basic 
+#    input verification
 # -------------------------------------------------------//
 def displayMenu():
     print("\n~-------------------------~")
@@ -222,6 +216,14 @@ def displayMenu():
 
 
 # main() ------------------------------------------------//
+#   receives course to download, sets up chrome
+#   preferences, opens driver, changes directory, and
+#   executes all functions
+# -------------------------------------------------------//
+
+# import config file
+config = configparser.ConfigParser()
+config.read('courses.ini')
 
 # display menu and get course choice
 i_num = displayMenu()
@@ -263,4 +265,5 @@ downloadCaptures(curr_lecs, cr_list)
 waitForDownload(curr_lecs, cr_list, i_num)
 renameFiles(curr_lecs, cr_list, i_num)
 
+# close driver
 driver.quit()
