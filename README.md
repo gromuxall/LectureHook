@@ -7,7 +7,9 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 - Chrome browser
 - Chrome WebDriver for your version of Chrome
 
-    *get it here:* https://chromedriver.chromium.org/downloads
+    + *download it here:* https://chromedriver.chromium.org/downloads
+    + extract and move chromedriver to a permanent location
+
 - Python version 3.4 or later
 - Selenium
 
