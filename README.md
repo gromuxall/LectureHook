@@ -10,7 +10,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
 
 - Chrome WebDriver for your version of Chrome
 
-    + [link](https://chromedriver.chromium.org/downloads "Download it here")
+    + [Download it here](https://chromedriver.chromium.org/downloads)
     + extract and move chromedriver to a permanent location
 
 - Selenium
@@ -26,7 +26,7 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     site = https://uic.blackboard.com
 
     [LOGIN]
-    userid = smadon3
+    userid = netid3
     pass = fakepassword23
 
     [PATHS]
@@ -43,9 +43,11 @@ LectureHook automates a Chrome browser to navigate to and download all of the le
     [NUM]
     num1 = 341
     num2 = 112
-    
+    ...
+
     [TIME]
     time1 = 
     time2 = 11am
+    ...
     ```
 2. 
