@@ -2,6 +2,8 @@
 
 LectureHook automates a Chrome browser to navigate to and download all of the lecture captures for a specified course. It is run at the command line and will require an input.
 
+This script will check the folder specified in the config file for the number of lectures already present and only download the remaining amount, so it is a good idea to keep them in their own folder.
+
 ## Installation
 
 **Dependencies**
