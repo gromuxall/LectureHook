@@ -37,7 +37,7 @@ def getToMyCourses():
     n = 0
     while n < 10: 
         try:
-            my_courses = WebDriverWait(driver, 10).until(
+            my_courses = WebDriverWait(driver, 30).until(
                 EC.element_to_be_clickable((By.LINK_TEXT, "My Courses")))
             my_courses.click()
             break;
@@ -54,18 +54,18 @@ def getToLectureCapture(i_num):
     crs = str(config['CODE']['code' + str(i_num)] + " " + config['NUM']['num' + str(i_num)])
        
     # clicks link to specific course
-    course = WebDriverWait(driver, 20).until(
+    course = WebDriverWait(driver, 30).until(
         EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '" + crs + "')]")))
     course.click()
 
     # changes frame
-    iframe = WebDriverWait(driver, 10).until(
+    iframe = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//iframe[@name='classic-learn-iframe']"))
         )
     driver.switch_to.frame(iframe)
 
     # waits for side menu to appear
-    WebDriverWait(driver, 10).until(
+    WebDriverWait(driver, 30).until(
         EC.element_to_be_clickable((By.XPATH, "//ul[@id='courseMenuPalette_contents']/li/a")))
 
     # clicks Lecture Capture link in side menu
@@ -78,7 +78,7 @@ def getToLectureCapture(i_num):
 #    navigates through time page if present 
 # -------------------------------------------------------//
 def timePage(t):
-    course_time = WebDriverWait(driver, 10).until(
+    course_time = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '" + t + "')]")))
     course_time.click()
 # end timePage()
@@ -88,7 +88,7 @@ def timePage(t):
 #    switches to new frame for lecture captures
 # -------------------------------------------------------//
 def switchToFrame():
-    iframe = WebDriverWait(driver, 10).until(
+    iframe = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, "//iframe[@id='contentFrame']")))
     driver.switch_to.frame(iframe)
 # end switchToFrame()
@@ -116,7 +116,7 @@ def appendFileName(cr_list):
 def downloadCaptures(num, cr_list):
 
     # wait for elements to appear
-    WebDriverWait(driver, 20).until(
+    WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
    
     # extract buttons
@@ -126,7 +126,7 @@ def downloadCaptures(num, cr_list):
     if num_lec > 0:
         media_capture[num].click()
         
-        WebDriverWait(driver,20).until(
+        WebDriverWait(driver,30).until(
             EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Download original')]")))
         
         # Needs a second or it hits view occasionally
@@ -134,7 +134,7 @@ def downloadCaptures(num, cr_list):
 
         (driver.find_element_by_xpath("//*[contains(text(), 'Download original')]")).click()
         
-        WebDriverWait(driver, 20).until(
+        WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//select[@name='video-one-files']")))
         
         # select HD version
