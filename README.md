@@ -69,7 +69,15 @@ This script will check the folder specified in the config file for the number of
 ## FAQ
 - Will this work on Windows?
 
-    I don't know.
+    Yes, although I am unsure as to whether you need to make it executable.
+    
+- Will this work on Mac?
+
+    Yes.
+    
+- Will this work on Linux?
+
+    Yes.
 
 - Will this work for a different school?
 
@@ -78,3 +86,4 @@ This script will check the folder specified in the config file for the number of
 - Why have you been doing this instead of your homework that is due soon?
 
     I don't know.
+    
