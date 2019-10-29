@@ -2,7 +2,7 @@
   <img src="https://github.com/gromuxall/imagehosting/blob/master/lecturehooklogo.png">
 </p>
 
-
+---
 
 LectureHook automates a Chrome browser to navigate to and download all of the lecture captures for a specified course. It is run at the command line and will require an input.
 
