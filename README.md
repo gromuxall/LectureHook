@@ -1,3 +1,7 @@
+<p align="left">
+  <img src="https://github.com/DavidCdeB/Trial/blob/master/Images/extract2.svg">
+</p>
+
 # LectureHook
 
 LectureHook automates a Chrome browser to navigate to and download all of the lecture captures for a specified course. It is run at the command line and will require an input.
