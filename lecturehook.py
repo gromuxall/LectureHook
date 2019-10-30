@@ -121,9 +121,17 @@ def downloadCaptures(num, cr_list):
    
     # extract buttons
     media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaInd')]")
+        # if you are an instructor, use 
+    #media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaIndicator capture highlight')]")
     num_lec = len(media_capture) - num
     
     if num_lec > 0:
+        # CHECK FOR num of lectures downloading currently
+        while numDownloads() > 2:
+            time.sleep(5)
+            print('Downloading max of three videos at once...')
+
+        media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaInd')]")
         media_capture[num].click()
         
         WebDriverWait(driver,30).until(
@@ -155,7 +163,16 @@ def downloadCaptures(num, cr_list):
 # end downloadCaptures()
 
 
-# waitForDownload ---------------------------------------//
+# numDownloads ------------------------------------------//
+#    return number of currently downloading files
+# -------------------------------------------------------//
+def numDownloads():
+    all_filenames = [i for i in glob.glob('hd*.{}'.format('crdownload'))]
+    return len(all_filenames)
+# end numDownloads()
+
+
+# waitfordownload ---------------------------------------//
 #    checks for files with extension .crdownload, which
 #    indicates that a file is still downloading and
 #    sleeps if so
