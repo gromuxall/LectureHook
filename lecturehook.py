@@ -40,7 +40,7 @@ def getToMyCourses():
             my_courses = WebDriverWait(driver, 30).until(
                 EC.element_to_be_clickable((By.LINK_TEXT, "My Courses")))
             my_courses.click()
-            break;
+            break
         except:
             n = n + 1
             time.sleep(1)
@@ -51,8 +51,9 @@ def getToMyCourses():
 #    traverses and loads the lecture capture page
 # -------------------------------------------------------//
 def getToLectureCapture(i_num):
-    crs = str(config['CODE']['code' + str(i_num)] + " " + config['NUM']['num' + str(i_num)])
-       
+    #crs = str(config['CODE']['code' + str(i_num)] + " " + config['NUM']['num' + str(i_num)])
+    crs = config['CRN']['crn' + str(i_num)]
+
     # clicks link to specific course
     course = WebDriverWait(driver, 30).until(
         EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '" + crs + "')]")))
@@ -69,8 +70,14 @@ def getToLectureCapture(i_num):
         EC.element_to_be_clickable((By.XPATH, "//ul[@id='courseMenuPalette_contents']/li/a")))
 
     # clicks Lecture Capture link in side menu
-    lec_cap_link = driver.find_element_by_xpath("//*[contains(text(), 'Lecture Capture')]")
-    lec_cap_link.click()
+    try:
+        lec_cap_link = driver.find_element_by_xpath("//*[contains(text(), 'Lecture Capture')]")
+        lec_cap_link.click()
+    except:
+        echo_link = driver.find_element_by_xpath("//*[contains(text(), 'Echo 360')]")
+        echo_link.click()
+
+
 # end getToLectureCapture()
 
 
@@ -120,7 +127,7 @@ def downloadCaptures(num, cr_list):
         EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
    
     # extract buttons
-    media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaInd')]")
+    media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaIndicator capture highlight')]")
         # if you are an instructor, use 
     #media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaIndicator capture highlight')]")
     num_lec = len(media_capture) - num
@@ -131,7 +138,7 @@ def downloadCaptures(num, cr_list):
             time.sleep(5)
             print('Downloading max of three videos at once...')
 
-        media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaInd')]")
+        media_capture = driver.find_elements_by_xpath("//*[contains(@class, 'courseMediaIndicator capture highlight')]")
         media_capture[num].click()
         
         WebDriverWait(driver,30).until(
