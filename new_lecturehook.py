@@ -19,6 +19,8 @@ import calendar as cal
 import argparse
 import functools
 import logging
+from seleniumrequests import Chrome
+from progress.spinner import Spinner
 from simple_term_menu import TerminalMenu
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -33,9 +35,10 @@ def slow_down(func):
     '''
     @functools.wraps(func)
     def wrapper_slow_down(*args, **kwargs):
-        while len([i for i in glob.glob('*.crdownload')]) > 2:
-            print('Max downloading three vids at once')
-            time.sleep(5)
+        if len([i for i in glob.glob('*.crdownload')]) > 2:
+            spinner = Spinner('MAX downloading three videos  ')
+            while len([i for i in glob.glob('*.crdownload')]) > 2:
+                spinner.next()
         return func(*args, **kwargs)
     return wrapper_slow_down
 
@@ -190,6 +193,9 @@ class Video:
         ))
         select.select_by_index(1)
 
+        options = DRIVER.find_elements_by_xpath("//option")
+        print(options[1].text)
+
         btn = DRIVER.find_element_by_xpath(
             "//a[@class='btn primary medium downloadBtn']"
         )
@@ -296,14 +302,9 @@ def print_menu():
     COURSES = sorted(COURSES, key=lambda x: x.crs_num)
     crs_names = [z.menu_line() for z in COURSES]
 
-    #cookies = DRIVER.get_cookies()
-    #for c in cookies:
-    #    print(c)
-    
     terminal_menu = TerminalMenu(crs_names)
     choice = terminal_menu.show()
 
-    #print('\n{}\n'.format(COURSES[choice]))
     COURSES[choice].goto_course()
 
 
@@ -377,7 +378,7 @@ if __name__ == "__main__":
     options.add_argument('--disable-gpu')
     prefs = {'prompt_for_download': False}
     options.add_experimental_option('prefs', prefs)
-    DRIVER = webdriver.Chrome(CONFIG['PATHS']['driver'], options=options)
+    DRIVER = Chrome(CONFIG['PATHS']['driver'], options=options)
 
     # global structs for ease of access
     COURSES = []
