@@ -21,8 +21,9 @@ import functools
 import logging
 from seleniumrequests import Chrome
 from progress.spinner import Spinner
+from progress.bar import Bar
 from simple_term_menu import TerminalMenu
-from selenium import webdriver
+#from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
@@ -39,6 +40,7 @@ def slow_down(func):
             spinner = Spinner('MAX downloading three videos  ')
             while len([i for i in glob.glob('*.crdownload')]) > 2:
                 spinner.next()
+            rename_files()
         return func(*args, **kwargs)
     return wrapper_slow_down
 
@@ -114,7 +116,7 @@ class Course:
 
         rows = DRIVER.find_elements_by_xpath("//div[contains(@class, 'class-row')]")
         for idx, row in enumerate(rows):
-            course = self.crs_code + self.crs_num
+            course = self
             title = row.find_element_by_class_name('header').text
             date = row.find_element_by_xpath(".//span[@class='date']").text
             index = idx
@@ -125,9 +127,14 @@ class Course:
         terminal_menu = TerminalMenu(menu_entries=vid_names, title=name)
         choice = terminal_menu.show()
 
+        # TODO right now this just downloads all of them, so change
+        quality_menu = TerminalMenu(menu_entries=['SD', 'HD', 'Audio Only'],
+                title='Quality')
+        qchoice = quality_menu.show()
+        
         for vid in lectures:
-            vid.download()
-            print('Downloading lecture {} from {}'.format(vid.index, vid.date))
+            vid.download(qchoice)
+            #print('Downloading lecture {} from {}'.format(vid.index, vid.date))
 
     # <Course> ------------------------------------------------------------- //
     def menu_line(self):
@@ -148,24 +155,54 @@ class Video:
         self.title = title
         self.date = date
         self.index = index
+        self.done = False
 
         # make map from month name to number
         cal_num = {name: num for num, name in enumerate(cal.month_name) if num}
 
-    
+
     # <Video> -------------------------------------------------------------- //
     def button(self):
         media_capture = DRIVER.find_elements_by_xpath(
             "//*[contains(@class, 'courseMediaIndicator capture')]")
-        
+
         return media_capture[self.index]
 
     # <Video> -------------------------------------------------------------- //
-    @slow_down
-    def download(self):
-        """
-        Clicks and selects quality, then downloading video
-        """
+    def complete(self):
+        '''
+        Mark as done for renaming so we don't rename twice
+        '''
+        self.done = True
+
+    # <Video> -------------------------------------------------------------- //
+    def is_done(self):
+        '''
+        Check renaming completion of video
+        '''
+        return self.done
+
+    # <Video> -------------------------------------------------------------- //
+    def header_line(self):
+        '''
+        Returns a formatted line with course information
+        '''
+        crs = self.course
+        return '{} {} - {}\n{} {} - {}'.format(crs.crs_code, crs.crs_num, 
+                crs.title, crs.term, crs.year, crs.crn)
+
+    # <Video> -------------------------------------------------------------- //
+    def lecture_line(self):
+        '''
+        Return a formatted line with video information
+        '''
+        return 'Lecture {} - {}'.format(self.index, self.date)
+
+    # <Video> -------------------------------------------------------------- //
+    def get_url(self, choice):
+        '''
+        Finds download urls for sd and hd versions
+        '''
         self.button().click()
         time.sleep(1)
 
@@ -186,30 +223,60 @@ class Video:
             )
         )
 
-        # select HD version TODO: give choice for sd or hd
-        #                   TODO: have this select be the webdriverwait above
         select = Select(DRIVER.find_element_by_xpath(
             "//select[@name='video-one-files']"
         ))
-        select.select_by_index(1)
+        select.select_by_index(choice)
 
-        options = DRIVER.find_elements_by_xpath("//option")
-        print(options[1].text)
-
-        btn = DRIVER.find_element_by_xpath(
+        url = DRIVER.find_element_by_xpath(
             "//a[@class='btn primary medium downloadBtn']"
-        )
-
-        DRIVER.find_element_by_xpath(
-            "//a[@class='btn primary medium downloadBtn']"
-        ).click()
+        ).get_attribute('href')
         
+        # click cancel button
+        DRIVER.find_element_by_xpath(
+            "//a[@class='btn white medium']"
+        ).click()
 
+        return url
+
+    # <Video> -------------------------------------------------------------- //
+    def download(self, qchoice):
+        """
+        Clicks and selects quality, then downloading video
+        """
+        download_file(self.get_url(qchoice), self)
 
         time.sleep(2)
         add_download(self)
-        LOGGER.info('Downloading video {}: {}'.format(self.index, self.date))
 
+
+# -------------------------------------------------------------------------- //
+def download_file(url, vid):
+    '''
+    Downloads a file in chunks and updates progress bar
+    '''
+    length = get_content_len(url)
+    with DRIVER.request('GET', url, stream=True) as res:
+        res.raise_for_status()
+        print('\n─────────────────────────────────────────────')
+        print(vid.header_line())
+        print(vid.lecture_line())
+        prog_bar = Bar('{}.mp4'.format(vid.index), max=int(length)/8192,
+                       fill='▓', suffix='%(percent)d%%')
+
+        with open('{}.mp4'.format(vid.index), 'wb') as file:
+            for chunk in res.iter_content(chunk_size=8192):
+                prog_bar.next()
+                file.write(chunk)
+
+
+# -------------------------------------------------------------------------- //
+def get_content_len(url):
+    '''
+    Returns integer content length of video
+    '''
+    res = DRIVER.request('HEAD', url)
+    return int(res.headers['Content-Length'])
 
 
 # -------------------------------------------------------------------------- //
@@ -253,6 +320,25 @@ def add_download(vid):
 
 
 # -------------------------------------------------------------------------- //
+def rename_files():
+    '''
+    Renames downloaded files
+    '''
+    dwns = [i for i in glob.glob('*.mp4')]
+    print('dwns: {}'.format(dwns))
+
+
+    for key, val in DOWNLOADS.items():
+        filename = '{}'.format(key)
+        print('filename: {}'.format(filename))
+        if filename in dwns:
+            #print('key: {} val:{}'.format(key, val.date))
+            new_val = DOWNLOADS.pop().index
+            os.rename(filename, '{}.mp4'.format(new_val))
+            print('renaming: {} to {}'.format(filename, new_val))
+
+
+# -------------------------------------------------------------------------- //
 def cleanup_files():
     '''
     Deletes any unfinished .crdownloads
@@ -265,16 +351,6 @@ def cleanup_files():
             os.remove(fname + '.crdownload')
             LOGGER.info('Deleted unfinished file: {}.crdownload'.format(fname))
 
-# -------------------------------------------------------------------------- //
-def switch_to_frame():
-    """
-    Switches frames. Annoying.
-    """
-    iframe = WebDriverWait(DRIVER, 30).until(
-        EC.presence_of_element_located((By.XPATH,\
-                "//iframe[@class='classic-learn-iframe']"))
-        )
-    DRIVER.switch_to.frame(iframe)
 
 
 # -------------------------------------------------------------------------- //
@@ -402,87 +478,3 @@ if __name__ == "__main__":
         # TODO: reactivate thiss
         #cleanup_files()
 
-
-
-
-
-
-
-
-"""
-# -------------------------------------------------------------------------- //
-def launch_page_collab():
-    # Initial get of origin page
-    DRIVER.get('https://uic.blackboard.com')
-    DRIVER.maximize_window()
-
-    # Click 'Sign In'
-    DRIVER.find_element_by_xpath("//a[@class='btn btn-primary text-center signIn']").click()
-
-    # Enter credentials
-    DRIVER.find_element_by_id('UserID').send_keys(CONFIG['LOGIN']['userid'])
-    DRIVER.find_element_by_id('password').send_keys(CONFIG['LOGIN']['pass'])
-    DRIVER.find_element_by_xpath("//button[@type='submit']").click()
-    print(MESSAGES['sign_in'])
-
-    # Click 'My Courses', attempt ten times
-    tries = 0
-    while tries < 10:
-        try:
-            my_courses = WebDriverWait(DRIVER, 30).until(
-                EC.element_to_be_clickable((By.LINK_TEXT, "My Courses"))
-            )
-            my_courses.click()
-            break
-        except:
-            tries = tries + 1
-            time.sleep(1)
-
-
-# -------------------------------------------------------------------------- //
-def choose_course():
-    #time.sleep(10)
-    WebDriverWait(DRIVER, 30).until(
-        EC.element_to_be_clickable((By.XPATH,\
-            "//div[contains(@id, 'course-list')]"))
-        )
-
-    courses = DRIVER.find_elements_by_xpath(\
-        "//a[@analytics-id='base.courses.courseCard.courseLink.link']"
-        )
-
-    # print list of courses
-    for idx, crs in enumerate(courses, 1):
-        print(idx, ') ', crs.find_element_by_xpath("//h4").text)
-
-    # prompt for input
-    choice = input('Choose course >> ')
-
-    courses[int(choice) - 1].click()
-
-
-# -------------------------------------------------------------------------- //
-def get_to_captures():
-    switch_to_frame()
-    print('SWITCHED FRAMES')
-
-    tries = 10
-    
-    # TODO redo with decorator timeout
-    try:
-        while tries > 0:
-            links = DRIVER.find_elements_by_xpath("//a")
-            names = map(lambda x: x.text, links)
-
-            if 'Blackboard Collaborate Ultra' in names:
-                for link in links:
-                    if link.text == 'Blackboard Collaborate Ultra':
-                        link.click()
-                        print('CLICKED LINK')
-                break
-
-            tries = tries - 1
-            time.sleep(1)
-    except:
-        print('ran out of tries')
-"""
