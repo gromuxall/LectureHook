@@ -19,6 +19,7 @@ import calendar as cal
 import argparse
 import functools
 import logging
+from secrets import USERID, EMAIL, PASS, DVR_PATH
 from seleniumrequests import Chrome
 from progress.spinner import Spinner
 from progress.bar import Bar
@@ -74,6 +75,7 @@ class Course:
         code_num = split_title[0].split()
         self.crs_code = code_num[0]
         self.crs_num = code_num[1]
+        self.url = course.find_element_by_xpath(".//a").get_attribute('href')
 
     # <Course> ------------------------------------------------------------- //
     def __str__(self):
@@ -94,11 +96,10 @@ class Course:
     # <Course> ------------------------------------------------------------- //
     def goto_course(self):
         """
-        Re-find element (to prevent stale element reference) and select
+        Changes active driver window to chosen course 
         """
-        javascript = "document.querySelectorAll(\"a[aria-label*=\'" + self.crn + "\']\")[0].click()"
-        DRIVER.execute_script(javascript)
-        time.sleep(2)
+        DRIVER.get(self.url)
+        time.sleep(2) # TODO change this
         self.get_lectures()
 
     # <Course> ------------------------------------------------------------- //
@@ -134,7 +135,6 @@ class Course:
         
         for vid in lectures:
             vid.download(qchoice)
-            #print('Downloading lecture {} from {}'.format(vid.index, vid.date))
 
     # <Course> ------------------------------------------------------------- //
     def menu_line(self):
@@ -292,12 +292,12 @@ def launch_page_echo():
     email_input = WebDriverWait(DRIVER, 10).until(
         EC.presence_of_element_located((By.XPATH, "//input[@name='email']"))
     )
-    email_input.send_keys(CONFIG['LOGIN']['email'])
+    email_input.send_keys(EMAIL)
     email_input.submit()
 
-    DRIVER.find_element_by_xpath("//input[@id='UserID']").send_keys(CONFIG['LOGIN']['userid'])
+    DRIVER.find_element_by_xpath("//input[@id='UserID']").send_keys(USERID)
     password = DRIVER.find_element_by_xpath("//input[@id='password']")
-    password.send_keys(CONFIG['LOGIN']['pass'])
+    password.send_keys(PASS)
     password.submit()
     print(MESSAGES['sign_in'])
 
@@ -364,9 +364,8 @@ def get_courses():
     containers = DRIVER.find_elements_by_xpath(("//span[@role='gridcell']"))
 
     for crs in containers:
+        url = crs.find_element_by_xpath(".//a").get_attribute('href')
         COURSES.append(Course(crs))
-
-
 
 
 # -------------------------------------------------------------------------- //
@@ -386,18 +385,14 @@ def print_menu():
 
 
 # -------------------------------------------------------------------------- //
-def check_flags():
+def check_path():
     """
-    Checks optional flags against zero or both being set
+    Checks if path exists and changes to that directory if so
     """
-    if ARGS.echo360 and ARGS.collab:
-        print('ERROR: Only one flag allowed')
-        PARSER.print_help()
-        sys.exit()
-    if not ARGS.echo360 and not ARGS.collab:
-        print('ERROR: One flag needed')
-        PARSER.print_help()
-        sys.exit()
+    if not os.path.isdir(ARGS.root):
+        print('ERROR: the path {} does not exist'.format(ARGS.root))
+
+    os.chdir(ARGS.root)
 
 
 # -------------------------------------------------------------------------- //
@@ -411,32 +406,28 @@ def main():
     print('/____/ /_/ /_/      Part of the Hook® Suite    ')
     print('\n───────────────────────────────────────────\n')
 
-    if ARGS.echo360:
-        print(MESSAGES['echo'])
-        launch_page_echo()
-        get_courses()
-        print_menu()
-    elif ARGS.collab:
-        print(MESSAGES['collab'])
-        #launch_page_collab()
-        #choose_course()
-        #get_to_captures()
-        #get_courses_collab
-        #print_courses_collab
+    print('Downloading to {}'.format(ARGS.root))
+    launch_page_echo()
+    get_courses()
+    print_menu()
 
 
 # -------------------------------------------------------------------------- //
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser(
-        description='Download lectures from Echo360 or Blackboard Collaborate.',
-        usage='python new_lecturehook.py [-e] [-c]')
-    PARSER.add_argument('-e', '--echo360', action='store_true', help='use this\
-            flag if videos you want to download are hosted with Echo360')
-    PARSER.add_argument('-c', '--collab', action='store_true', help='use this\
-            flag if videos you want to download are hosted with Blackboard Collaborate')
+        #description='Download lectures from Echo360 or Blackboard Collaborate.',
+        description='Download lectures from Echo360.',
+        #usage='python new_lecturehook.py [-e] [-c]')
+        usage='python new_lecturehook.py [-r]')
+    #PARSER.add_argument('-e', '--echo360', action='store_true', help='use this\
+    #        flag if videos you want to download are hosted with Echo360')
+    #PARSER.add_argument('-c', '--collab', action='store_true', help='use this\
+    #        flag if videos you want to download are hosted with Blackboard Collaborate')
+    PARSER.add_argument('-r', '--root', required=True, help='type in full path\
+            of the root folder you want the videos downloaded to')
     ARGS = PARSER.parse_args()
 
-    check_flags()
+    check_path()
 
     # setup the logger
     LOGGER = logging.getLogger('lhook_logger')
@@ -445,16 +436,16 @@ if __name__ == "__main__":
     # read preliminary info from config file
     # TODO autogenerate config file
         # if config file doesn't exist, create one and prompt for input
-    CONFIG = configparser.ConfigParser()
-    CONFIG.read('courses.ini')
+    #CONFIG = configparser.ConfigParser()
+    #CONFIG.read('courses.ini')
 
     # set browser options
     options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
+    #options.add_argument('--headless')
+    #options.add_argument('--disable-gpu')
     prefs = {'prompt_for_download': False}
     options.add_experimental_option('prefs', prefs)
-    DRIVER = Chrome(CONFIG['PATHS']['driver'], options=options)
+    DRIVER = Chrome(DVR_PATH, options=options)
 
     # global structs for ease of access
     COURSES = []
@@ -477,4 +468,3 @@ if __name__ == "__main__":
         DRIVER.quit()
         # TODO: reactivate thiss
         #cleanup_files()
-
