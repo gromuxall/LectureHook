@@ -6,8 +6,9 @@
     smadon3@uic.edu
 
     TODO:
-        - make all downloads headless
+        - pickle session to file and load to avoid login
         - make prompt to fill config file
+
 """
 import configparser
 import sys
@@ -19,6 +20,10 @@ import calendar as cal
 import argparse
 import functools
 import logging
+import errno
+from tqdm import tqdm
+from js import *
+import concurrent.futures
 from secrets import USERID, EMAIL, PASS, DVR_PATH
 from seleniumrequests import Chrome
 from progress.spinner import Spinner
@@ -41,7 +46,7 @@ def slow_down(func):
             spinner = Spinner('MAX downloading three videos  ')
             while len([i for i in glob.glob('*.crdownload')]) > 2:
                 spinner.next()
-            rename_files()
+            #rename_files()
         return func(*args, **kwargs)
     return wrapper_slow_down
 
@@ -57,7 +62,7 @@ class ElementNotFound(Exception):
         super().__init__(self.message)
 
 
-class Course:
+class Course():
     '''
     Contains all info and methods for courses
     scraped from Echo360
@@ -76,6 +81,7 @@ class Course:
         self.crs_code = code_num[0]
         self.crs_num = code_num[1]
         self.url = course.find_element_by_xpath(".//a").get_attribute('href')
+        self.lectures = []
 
     # <Course> ------------------------------------------------------------- //
     def __str__(self):
@@ -94,48 +100,20 @@ class Course:
         return 3
 
     # <Course> ------------------------------------------------------------- //
+    def folder_name(self):
+        return self.crs_code + self.crs_num
+
+    # <Course> ------------------------------------------------------------- //
     def goto_course(self):
         """
-        Changes active driver window to chosen course 
+        Changes active driver window to chosen course
         """
         DRIVER.get(self.url)
         time.sleep(2) # TODO change this
-        self.get_lectures()
-
-    # <Course> ------------------------------------------------------------- //
-    def get_lectures(self):
-        """
-        Get lecture elements
-        """
-        #os.chdir('/home/smadonna/Downloads')
-        lectures = []
-        name = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
-
-        # wait for elements to appear
-        WebDriverWait(DRIVER, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
-
-        rows = DRIVER.find_elements_by_xpath("//div[contains(@class, 'class-row')]")
-        for idx, row in enumerate(rows):
-            course = self
-            title = row.find_element_by_class_name('header').text
-            date = row.find_element_by_xpath(".//span[@class='date']").text
-            index = idx
-            lectures.append(Video(course, title, date, index))
-
-        vid_names = [v.date for v in lectures]
-        vid_names.insert(0, 'all videos')
-        terminal_menu = TerminalMenu(menu_entries=vid_names, title=name)
-        choice = terminal_menu.show()
-
-        # TODO right now this just downloads all of them, so change
-        quality_menu = TerminalMenu(menu_entries=['SD', 'HD', 'Audio Only'],
-                title='Quality')
-        qchoice = quality_menu.show()
         
-        for vid in lectures:
-            vid.download(qchoice)
+        self.fill_lectures()
 
+    
     # <Course> ------------------------------------------------------------- //
     def menu_line(self):
         """
@@ -143,9 +121,143 @@ class Course:
         """
         title_str = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
         return title_str.ljust(42) + (self.crn).ljust(20)
+    
+
+    # <Course> ------------------------------------------------------------- //
+    def fill_lectures(self):
+        """
+        Get lecture elements
+        """
+
+        # wait for elements to appear
+        WebDriverWait(DRIVER, 30).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
+        # TODO: have rows equal the webdriverwait
+        rows = DRIVER.find_elements_by_xpath("//div[contains(@class, 'class-row')]")
+        
+        for idx, row in enumerate(rows):
+            title = row.find_element_by_class_name('header').text
+            date = row.find_element_by_xpath(".//span[@class='date']").text
+            self.lectures.append(Video(self, title, date, idx))
+
+        '''here is where I should extract all the video links'''
+        DRIVER.execute_script(
+            '''
+            {}
+
+            btns = document.querySelectorAll("div[class*='courseMediaIndicator capture']")
+            click_all(btns)
+            '''.format(CLICK_ALL)
+            )
+
+        '''move this to a wait function and make decorator for timing and killing'''
+        tries = 30
+        while tries > 0:
+            try:
+                li_elems = DRIVER.find_elements_by_xpath("//div[@class='menu-items']/ul/li/a")
+                if (len(li_elems) / 3) == len(self.lectures):
+                    break
+            except Exception as e:
+                #print('waiting....{}'.format(e))
+                time.sleep(1)
+                tries -= 1
+        
+        DRIVER.execute_script(
+            '''
+            {}{}
+
+            li_elems = document.querySelectorAll(".menu-items ul li a");
+            dwns = filter_list(li_elems)
+            click_all(dwns)
+            '''.format(CLICK_ALL, FILTER_LIST)
+            )
+        
+        '''move this to a wait function and make decorator for timing and killing'''
+        selects = []
+        tries = 30
+        while tries > 0:
+            try:
+                selects = DRIVER.find_elements_by_xpath(
+                        "//select[@name='video-one-files']")
+                if len(selects) == len(self.lectures):
+                    break
+            except Exception as e:
+                print('len(selects): {}, len(self.lectures): {}'.format(len(selects), len(self.lectures)))
+                time.sleep(1)
+                tries -= 1
+
+        for sel, vid in zip(selects, self.lectures):
+            ops = sel.find_elements_by_xpath("./option")
+            vid.sd_link = ops[0].get_attribute('value').split(' || ')[0]# split off into method
+            vid.hd_link = ops[1].get_attribute('value').split(' || ')[0]
+
+        vid_names = [v.date for v in self.lectures]
+        vid_names.insert(0, 'all videos')
+
+        name = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
+        terminal_menu = TerminalMenu(menu_entries=vid_names, title=name)
+        choice = terminal_menu.show()
+
+        quality_menu = TerminalMenu(menu_entries=['SD', 'HD'],
+                                    title='Quality')
+        qchoice = quality_menu.show()
+
+        check_dir(self.folder_name())
+
+        if choice == 0:
+            # download all videos
+            if qchoice == 0: # change this to enum SD=0, HD=1
+                vid_urls = [(vid, vid.sd_link) for vid in self.lectures]
+            else:
+                vid_urls = [(vid, vid.hd_link) for vid in self.lectures]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                futures = []
+                for v_url in vid_urls:
+                    futures.append(executor.submit(download_file, entry=v_url))
+                #for future in concurrent.futures.as_completed(futures):
+        else:
+            vid = self.lectures[choice-1]
+            if qchoice == 0:
+                download_file((vid, vid.sd_link))
+            else:
+                download_file((vid, vid.hd_link))
 
 
-class Video:
+
+
+
+# -------------------------------------------------------------------------- //
+def download_file(entry):
+    '''
+    Downloads a file in chunks and updates progress bar
+    '''
+    vid, url = entry
+    length = get_content_len(url)
+    with DRIVER.request('GET', url, stream=True) as res:
+        res.raise_for_status()
+        #print('\n─────────────────────────────────────────────')
+        #print(vid.header_line())
+        #print(vid.lecture_line())
+        #prog_bar = Bar('{}.mp4'.format(vid.vid_title()), max=int(length)/8192,
+        #               fill='▓', suffix='%(percent)d%%')
+        text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
+        pbar = tqdm(total=int(int(length)/8192), initial=0, unit='B',
+                    position=vid.index, desc=text, leave=False, ncols=90,
+                    bar_format='{desc} {percentage:3.0f}%|{bar}|{r_bar}')
+
+        with open('{}.mp4'.format(vid.vid_title()), 'wb') as file:
+            for chunk in res.iter_content(chunk_size=8192):
+                pbar.update(1)
+                file.write(chunk)
+        
+        tqdm.write('{} finished downloading.'.format(vid.vid_title()))
+        
+        pbar.close()
+        
+        #return 'lec{} downloaded'.format(vid.index)
+
+
+class Video():
     """
     Object representing a class-row of a lecture for a given course
     """
@@ -156,9 +268,11 @@ class Video:
         self.date = date
         self.index = index
         self.done = False
+        self.sd_link = ''    #<---- make this a tuple url = (SD, HD)
+        self.hd_link = ''
 
         # make map from month name to number
-        cal_num = {name: num for num, name in enumerate(cal.month_name) if num}
+        self.cal_num = {name: str(num).zfill(2) for num, name in enumerate(cal.month_name) if num}
 
 
     # <Video> -------------------------------------------------------------- //
@@ -167,6 +281,18 @@ class Video:
             "//*[contains(@class, 'courseMediaIndicator capture')]")
 
         return media_capture[self.index]
+
+    # <Video> -------------------------------------------------------------- //
+    def get_date(self):
+        '''
+        Returns string with numeric date
+
+        Example:
+        August 29, 2019 => 08-29-2019
+        '''
+        splits = self.date.replace(',', ' ').split()
+        return '{}-{}-{}'.format(self.cal_num[splits[0]], splits[1].zfill(2), splits[2])
+
 
     # <Video> -------------------------------------------------------------- //
     def complete(self):
@@ -188,8 +314,9 @@ class Video:
         Returns a formatted line with course information
         '''
         crs = self.course
-        return '{} {} - {}\n{} {} - {}'.format(crs.crs_code, crs.crs_num, 
-                crs.title, crs.term, crs.year, crs.crn)
+        return '{} {} - {}\n{} {} - {}'.format(crs.crs_code, crs.crs_num,
+                                               crs.title, crs.term,
+                                               crs.year, crs.crn)
 
     # <Video> -------------------------------------------------------------- //
     def lecture_line(self):
@@ -197,6 +324,17 @@ class Video:
         Return a formatted line with video information
         '''
         return 'Lecture {} - {}'.format(self.index, self.date)
+
+
+    # <Video> -------------------------------------------------------------- //
+    def vid_title(self):
+        '''
+        Return formatted video title
+        '''
+        crs = self.course
+        return '{}{}-lec{}_{}'.format(crs.crs_code, crs.crs_num,
+                                      str(self.index).zfill(2), self.get_date())
+
 
     # <Video> -------------------------------------------------------------- //
     def get_url(self, choice):
@@ -231,7 +369,7 @@ class Video:
         url = DRIVER.find_element_by_xpath(
             "//a[@class='btn primary medium downloadBtn']"
         ).get_attribute('href')
-        
+
         # click cancel button
         DRIVER.find_element_by_xpath(
             "//a[@class='btn white medium']"
@@ -240,34 +378,14 @@ class Video:
         return url
 
     # <Video> -------------------------------------------------------------- //
-    def download(self, qchoice):
+    #def download(self, qchoice):
         """
         Clicks and selects quality, then downloading video
         """
-        download_file(self.get_url(qchoice), self)
-
-        time.sleep(2)
-        add_download(self)
+    #    download_file(self.get_url(qchoice), self)
+    #    time.sleep(2)
 
 
-# -------------------------------------------------------------------------- //
-def download_file(url, vid):
-    '''
-    Downloads a file in chunks and updates progress bar
-    '''
-    length = get_content_len(url)
-    with DRIVER.request('GET', url, stream=True) as res:
-        res.raise_for_status()
-        print('\n─────────────────────────────────────────────')
-        print(vid.header_line())
-        print(vid.lecture_line())
-        prog_bar = Bar('{}.mp4'.format(vid.index), max=int(length)/8192,
-                       fill='▓', suffix='%(percent)d%%')
-
-        with open('{}.mp4'.format(vid.index), 'wb') as file:
-            for chunk in res.iter_content(chunk_size=8192):
-                prog_bar.next()
-                file.write(chunk)
 
 
 # -------------------------------------------------------------------------- //
@@ -286,7 +404,6 @@ def launch_page_echo():
 
     TODO:
         - check config file for values and prompt if no values
-        - change hardcoded values to config file
     """
     DRIVER.get('https://echo360.org/courses')
     email_input = WebDriverWait(DRIVER, 10).until(
@@ -304,56 +421,6 @@ def launch_page_echo():
 
 
 # -------------------------------------------------------------------------- //
-def add_download(vid):
-    '''
-    Because files may finish downloading out of order, this will
-    search for a currently downloading file and append to the
-    download list before another starts downloading
-    '''
-    curr_dwns = [i for i in glob.glob('*.crdownload')]
-
-    for fname in curr_dwns:
-        fname = fname.split('.crdownload')[0]
-        if fname not in DOWNLOADS:
-            DOWNLOADS[fname] = vid
-            LOGGER.info('Added k:{} -> v:{}'.format(fname, vid))
-
-
-# -------------------------------------------------------------------------- //
-def rename_files():
-    '''
-    Renames downloaded files
-    '''
-    dwns = [i for i in glob.glob('*.mp4')]
-    print('dwns: {}'.format(dwns))
-
-
-    for key, val in DOWNLOADS.items():
-        filename = '{}'.format(key)
-        print('filename: {}'.format(filename))
-        if filename in dwns:
-            #print('key: {} val:{}'.format(key, val.date))
-            new_val = DOWNLOADS.pop().index
-            os.rename(filename, '{}.mp4'.format(new_val))
-            print('renaming: {} to {}'.format(filename, new_val))
-
-
-# -------------------------------------------------------------------------- //
-def cleanup_files():
-    '''
-    Deletes any unfinished .crdownloads
-    '''
-    curr_dwns = [i for i in glob.glob('*.crdownload')]
-
-    for fname in curr_dwns:
-        fname = fname.split('.crdownload')[0]
-        if fname in DOWNLOADS:
-            os.remove(fname + '.crdownload')
-            LOGGER.info('Deleted unfinished file: {}.crdownload'.format(fname))
-
-
-
-# -------------------------------------------------------------------------- //
 def get_courses():
     """
     Get list of courses
@@ -363,8 +430,7 @@ def get_courses():
     )
     containers = DRIVER.find_elements_by_xpath(("//span[@role='gridcell']"))
 
-    for crs in containers:
-        url = crs.find_element_by_xpath(".//a").get_attribute('href')
+    for crs in containers: 
         COURSES.append(Course(crs))
 
 
@@ -383,9 +449,28 @@ def print_menu():
     COURSES[choice].goto_course()
 
 
+# -------------------------------------------------------------------------- //
+def check_dir(path):
+    '''
+    Check if directory exists
+
+    on True:
+       changes to chosen directory
+
+    on False:
+        creates directory and changes to it
+    '''
+    try:
+        os.mkdir(path)
+        os.chdir(path)
+    except IOError as err:
+        if err.errno == errno.EEXIST:
+            print('Downloading to {}'.format(path))
+            os.chdir(path)
+
 
 # -------------------------------------------------------------------------- //
-def check_path():
+def check_root_path():
     """
     Checks if path exists and changes to that directory if so
     """
@@ -419,15 +504,12 @@ if __name__ == "__main__":
         description='Download lectures from Echo360.',
         #usage='python new_lecturehook.py [-e] [-c]')
         usage='python new_lecturehook.py [-r]')
-    #PARSER.add_argument('-e', '--echo360', action='store_true', help='use this\
-    #        flag if videos you want to download are hosted with Echo360')
-    #PARSER.add_argument('-c', '--collab', action='store_true', help='use this\
-    #        flag if videos you want to download are hosted with Blackboard Collaborate')
     PARSER.add_argument('-r', '--root', required=True, help='type in full path\
             of the root folder you want the videos downloaded to')
+    PARSER.add_argument('-w', '--window', action='store_true', help='show window')
     ARGS = PARSER.parse_args()
 
-    check_path()
+    check_root_path()
 
     # setup the logger
     LOGGER = logging.getLogger('lhook_logger')
@@ -441,7 +523,9 @@ if __name__ == "__main__":
 
     # set browser options
     options = Options()
-    #options.add_argument('--headless')
+    
+    if not ARGS.window:
+        options.add_argument('--headless')
     #options.add_argument('--disable-gpu')
     prefs = {'prompt_for_download': False}
     options.add_experimental_option('prefs', prefs)
@@ -449,7 +533,6 @@ if __name__ == "__main__":
 
     # global structs for ease of access
     COURSES = []
-    DOWNLOADS = {}
 
     # msg dictionary for laziness
     MESSAGES = {
@@ -464,7 +547,4 @@ if __name__ == "__main__":
     #except:
     #    print('Exiting')
     finally:
-        print('Cleaning up unfinished files')
         DRIVER.quit()
-        # TODO: reactivate thiss
-        #cleanup_files()
