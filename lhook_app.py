@@ -21,6 +21,8 @@ import argparse
 import functools
 import logging
 import errno
+import pickle
+import yaml
 from enum import Enum
 from tqdm import tqdm
 from js import *
@@ -221,14 +223,6 @@ class Course():
 
 
         if choice == 0: # Chose 'All Videos'
-            # download all videos
-            #if qchoice == Quality.SD.value: # change this to enum SD=0, HD=1
-            #    vid_urls = [(vid, vid.sd_link) for vid in self.lectures]
-            #else:
-            #    vid_urls = [(vid, vid.hd_link) for vid in self.lectures]
-            #pbar = tqdm(total=len(self.lectures), initial=0, position=0, ncols=90,
-            #            bar_format='{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
-            #pbar.update(0)
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 futures = []
                 tasks = []
@@ -240,29 +234,38 @@ class Course():
                 #    #tiasks[ret].finish_
         else:
             vid = self.lectures[choice-1]
-            if qchoice == Quality.SD.value:
-                download_file((vid, vid.sd_link))
-            else:
-                download_file((vid, vid.hd_link))
+            Task(vid, qchoice).download()
 
 
 class Task():
-    
+    '''
+    Object for initializing progress bar for downloads and performing
+    the download upon call
+    '''
     def __init__(self, vid, quality):
         self.vid = vid
         self.url = vid.url(quality)
-        self.length = get_content_len(self.url)
+        self.length = vid.get_content_len(quality)
         text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
         self.pbar = tqdm(total=int(int(self.length)/8192), initial=0,
-                    position=vid.index, desc=text, leave=False, ncols=90,
-                    bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+                         position=vid.index, desc=text, leave=False,
+                         ncols=90, bar_format='{desc} {percentage:3.0f}\
+                                               %|{bar}| {n_fmt}/{total_fmt}')
         self.pbar.update(0)
-    
+
+    # <Task> --------------------------------------------------------------- //
     def finish_msg(self):
-        self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()), pos=self.vid.index)
+        '''
+        Display confirmation message
+        '''
+        self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()), 
+                          pos=self.vid.index)
 
-
+    # <Task> --------------------------------------------------------------- //
     def download(self):
+        '''
+        Stream downloads file pointed to by self.url and returns index
+        '''
         with DRIVER.request('GET', self.url, stream=True) as res:
             res.raise_for_status()
 
@@ -275,9 +278,12 @@ class Task():
 
 
 class Video():
-    """
+    '''
     Object representing a class-row of a lecture for a given course
-    """
+    '''
+    cal_num = {name: str(num).zfill(2) for num, name in
+               enumerate(cal.month_name) if num}
+
     # <Video> -------------------------------------------------------------- //
     def __init__(self, course, title, date, index):
         self.course = course
@@ -289,10 +295,13 @@ class Video():
             'HD': ''
             }
 
-        # TODO: move this out from loop, so as not to run every single time
-        # make map from month name to number
-        self.cal_num = {name: str(num).zfill(2) for num, name in
-                        enumerate(cal.month_name) if num}
+    # <Video> -------------------------------------------------------------- //
+    def get_content_len(self, quality):
+        '''
+        Returns integer content length of video
+        '''
+        res = DRIVER.request('HEAD', self.links[Quality(quality).name])
+        return int(res.headers['Content-Length'])
 
     # <Video> -------------------------------------------------------------- //
     def url(self, num):
@@ -310,8 +319,8 @@ class Video():
         August 29, 2019 => 08-29-2019
         '''
         splits = self.date.replace(',', ' ').split()
-        return '{}-{}-{}'.format(self.cal_num[splits[0]], splits[1].zfill(2),
-                                 splits[2])
+        return '{}-{}-{}'.format(Video.cal_num[splits[0]],
+                                 splits[1].zfill(2), splits[2])
 
     # <Video> -------------------------------------------------------------- //
     def vid_title(self):
@@ -321,16 +330,6 @@ class Video():
         crs = self.course
         return '{}{}-lec{}_{}'.format(crs.crs_code, crs.crs_num,
                                       str(self.index).zfill(2), self.get_date())
-
-
-#TODO: make this as class/static method
-# -------------------------------------------------------------------------- //
-def get_content_len(url):
-    '''
-    Returns integer content length of video
-    '''
-    res = DRIVER.request('HEAD', url)
-    return int(res.headers['Content-Length'])
 
 
 # -------------------------------------------------------------------------- //
@@ -407,9 +406,9 @@ def check_dir(path):
 
 # -------------------------------------------------------------------------- //
 def check_root_path():
-    """
+    '''
     Checks if path exists and changes to that directory if so
-    """
+    '''
     if not os.path.isdir(ARGS.root):
         print('ERROR: the path {} does not exist'.format(ARGS.root))
 
@@ -417,12 +416,20 @@ def check_root_path():
 
 
 # -------------------------------------------------------------------------- //
+def save_state(config):
+    '''
+    Loads previous state of program
+    '''
+    with open('config.yaml', 'w') as fp:
+        yaml.dump(config, fp)
+
+
+# -------------------------------------------------------------------------- //
 def main():
-    """
+    '''
     Main program
-    """
-    print('\nLectureHook for Echo360')
-    print('root folder: {}'.format(ARGS.root))
+    '''
+    print(MESSAGES['intro'], MESSAGES['root'])
     launch_page_echo()
     get_courses()
     print_menu()
@@ -431,51 +438,55 @@ def main():
 # -------------------------------------------------------------------------- //
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser(
-        #description='Download lectures from Echo360 or Blackboard Collaborate.',
         description='Download lectures from Echo360.',
-        #usage='python new_lecturehook.py [-e] [-c]')
         usage='python new_lecturehook.py [-r]')
     PARSER.add_argument('-r', '--root', required=True, help='type in full path\
             of the root folder you want the videos downloaded to')
     PARSER.add_argument('-w', '--window', action='store_true', help='show window')
+    PARSER.add_argument('-l', '--log', action='store_true', help='debug logging')
     ARGS = PARSER.parse_args()
 
+    try:
+        with open('config.yaml') as handle:
+            CONFIG = yaml.load(handle, Loader=yaml.FullLoader)
+    except FileNotFoundError:
+        with open('config.yaml', 'w') as handle:
+            pass
+    
+    # TODO: if no root path
     check_root_path()
 
-    # setup the logger
     LOGGER = logging.getLogger('lhook_logger')
-    #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-
-    # read preliminary info from config file
-    # TODO autogenerate config file
-        # if config file doesn't exist, create one and prompt for input
-    #CONFIG = configparser.ConfigParser()
-    #CONFIG.read('courses.ini')
-
-    # set browser options
     OPTIONS = Options()
 
     if not ARGS.window:
         OPTIONS.add_argument('--headless')
-    #options.add_argument('--disable-gpu')
+
+    if ARGS.log:
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
     PREFS = {'prompt_for_download': False}
     OPTIONS.add_experimental_option('prefs', PREFS)
     DRIVER = Chrome(DVR_PATH, options=OPTIONS)
 
-    # global structs for ease of access
+
     COURSES = []
 
     # msg dictionary for laziness
     MESSAGES = {
+        'intro': '\nLectureHook for Echo360',
+        'root': '\nroot folder: {}'.format(ARGS.root),
         'sign_in': 'Signing in...',
         'collab': 'Fetching videos from Blackboard Collaborate',
         'echo': 'Fetching videos from Echo360',
+        'exit': 'Exiting'
         }
 
     # begin program
     try:
         main()
-    #except:
-    #    print('Exiting')
+    except Exception as err:
+        print(MESSAGES['exit'])
+        LOGGER.info(err)
     finally:
         DRIVER.quit()
