@@ -21,6 +21,7 @@ import argparse
 import functools
 import logging
 import errno
+from enum import Enum
 from tqdm import tqdm
 from js import *
 import concurrent.futures
@@ -60,6 +61,15 @@ class ElementNotFound(Exception):
         self.element = element
         self.message = message
         super().__init__(self.message)
+
+
+class Quality(Enum):
+    '''
+    Integer representing position of quality in dropdown options
+    for select
+    '''
+    SD = 0
+    HD = 1
 
 
 class Course():
@@ -111,6 +121,7 @@ class Course():
         DRIVER.get(self.url)
         time.sleep(2) # TODO change this
         
+        check_dir(self.folder_name())
         self.fill_lectures()
 
     
@@ -121,7 +132,13 @@ class Course():
         """
         title_str = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
         return title_str.ljust(42) + (self.crn).ljust(20)
-    
+
+    @staticmethod
+    def split_link(string):
+        '''
+        Utility that splits off url from accompanying information
+        '''
+        return string.get_attribute('value').split(' || ')[0]
 
     # <Course> ------------------------------------------------------------- //
     def fill_lectures(self):
@@ -188,8 +205,8 @@ class Course():
 
         for sel, vid in zip(selects, self.lectures):
             ops = sel.find_elements_by_xpath("./option")
-            vid.sd_link = ops[0].get_attribute('value').split(' || ')[0]# split off into method
-            vid.hd_link = ops[1].get_attribute('value').split(' || ')[0]
+            vid.links['SD'] = Course.split_link(ops[Quality.SD.value])
+            vid.links['HD'] = Course.split_link(ops[Quality.HD.value])
 
         vid_names = [v.date for v in self.lectures]
         vid_names.insert(0, 'all videos')
@@ -202,28 +219,28 @@ class Course():
                                     title='Quality')
         qchoice = quality_menu.show()
 
-        check_dir(self.folder_name())
 
-        if choice == 0:
+        if choice == 0: # Chose 'All Videos'
             # download all videos
-            if qchoice == 0: # change this to enum SD=0, HD=1
-                vid_urls = [(vid, vid.sd_link) for vid in self.lectures]
-            else:
-                vid_urls = [(vid, vid.hd_link) for vid in self.lectures]
+            #if qchoice == Quality.SD.value: # change this to enum SD=0, HD=1
+            #    vid_urls = [(vid, vid.sd_link) for vid in self.lectures]
+            #else:
+            #    vid_urls = [(vid, vid.hd_link) for vid in self.lectures]
             #pbar = tqdm(total=len(self.lectures), initial=0, position=0, ncols=90,
             #            bar_format='{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+            #pbar.update(0)
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 futures = []
                 tasks = []
                 for vid in self.lectures:
-                    tasks.append(Task(vid))
+                    tasks.append(Task(vid, qchoice))
                 for task in tasks:
                     futures.append(executor.submit(task.download))
-                #for _ in concurrent.futures.as_completed(futures):
-                #    pbar.update(1)
+                #for ret in concurrent.futures.as_completed(futures):
+                #    #tiasks[ret].finish_
         else:
             vid = self.lectures[choice-1]
-            if qchoice == 0:
+            if qchoice == Quality.SD.value:
                 download_file((vid, vid.sd_link))
             else:
                 download_file((vid, vid.hd_link))
@@ -231,50 +248,30 @@ class Course():
 
 class Task():
     
-    def __init__(self, vid):
+    def __init__(self, vid, quality):
         self.vid = vid
-        self.length = get_content_len(vid.sd_link) #TODO: big NO-NO, using sd_link as a sample!
-        self.url = vid.sd_link
+        self.url = vid.url(quality)
+        self.length = get_content_len(self.url)
         text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
-        self.pbar = tqdm(total=int(int(self.length)/8192), initial=0, unit='B',
-                    position=vid.index, desc=text, leave=True, ncols=90,
+        self.pbar = tqdm(total=int(int(self.length)/8192), initial=0,
+                    position=vid.index, desc=text, leave=False, ncols=90,
                     bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
         self.pbar.update(0)
+    
+    def finish_msg(self):
+        self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()), pos=self.vid.index)
+
 
     def download(self):
         with DRIVER.request('GET', self.url, stream=True) as res:
             res.raise_for_status()
-            text = 'lec{}.mp4'.format(str(self.vid.index).zfill(2))
 
             with open('{}.mp4'.format(self.vid.vid_title()), 'wb') as file:
                 for chunk in res.iter_content(chunk_size=8192):
                     self.pbar.update(1)
                     file.write(chunk)
-            #self.pbar.close()
-
-
-# -------------------------------------------------------------------------- //
-def download_file(entry):
-    '''
-    Downloads a file in chunks and updates progress bar
-    '''
-    vid, url = entry
-    length = get_content_len(url)
-    with DRIVER.request('GET', url, stream=True) as res:
-        res.raise_for_status()
-        text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
-        pbar = tqdm(total=int(int(length)/8192), initial=0, unit='B',
-                    position=vid.index, desc=text, leave=False, ncols=90,
-                    bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
-
-        with open('{}.mp4'.format(vid.vid_title()), 'wb') as file:
-            for chunk in res.iter_content(chunk_size=8192):
-                pbar.update(1)
-                file.write(chunk)
-
-        #tqdm.write('{} finished downloading.'.format(vid.vid_title()))
-        #tqdm.write(_term_move_up() + '\r')
-        pbar.close()
+                self.finish_msg()
+        return self.vid.index
 
 
 class Video():
@@ -287,20 +284,22 @@ class Video():
         self.title = title
         self.date = date
         self.index = index
-        self.done = False
-        self.sd_link = ''    #<---- make this a tuple url = (SD, HD)
-        self.hd_link = ''
+        self.links = {
+            'SD': '',
+            'HD': ''
+            }
 
+        # TODO: move this out from loop, so as not to run every single time
         # make map from month name to number
-        self.cal_num = {name: str(num).zfill(2) for num, name in enumerate(cal.month_name) if num}
-
+        self.cal_num = {name: str(num).zfill(2) for num, name in
+                        enumerate(cal.month_name) if num}
 
     # <Video> -------------------------------------------------------------- //
-    def button(self):
-        media_capture = DRIVER.find_elements_by_xpath(
-            "//*[contains(@class, 'courseMediaIndicator capture')]")
-
-        return media_capture[self.index]
+    def url(self, num):
+        '''
+        Return link for specified quality
+        '''
+        return self.links[Quality(num).name]
 
     # <Video> -------------------------------------------------------------- //
     def get_date(self):
@@ -311,40 +310,8 @@ class Video():
         August 29, 2019 => 08-29-2019
         '''
         splits = self.date.replace(',', ' ').split()
-        return '{}-{}-{}'.format(self.cal_num[splits[0]], splits[1].zfill(2), splits[2])
-
-
-    # <Video> -------------------------------------------------------------- //
-    def complete(self):
-        '''
-        Mark as done for renaming so we don't rename twice
-        '''
-        self.done = True
-
-    # <Video> -------------------------------------------------------------- //
-    def is_done(self):
-        '''
-        Check renaming completion of video
-        '''
-        return self.done
-
-    # <Video> -------------------------------------------------------------- //
-    def header_line(self):
-        '''
-        Returns a formatted line with course information
-        '''
-        crs = self.course
-        return '{} {} - {}\n{} {} - {}'.format(crs.crs_code, crs.crs_num,
-                                               crs.title, crs.term,
-                                               crs.year, crs.crn)
-
-    # <Video> -------------------------------------------------------------- //
-    def lecture_line(self):
-        '''
-        Return a formatted line with video information
-        '''
-        return 'Lecture {} - {}'.format(self.index, self.date)
-
+        return '{}-{}-{}'.format(self.cal_num[splits[0]], splits[1].zfill(2),
+                                 splits[2])
 
     # <Video> -------------------------------------------------------------- //
     def vid_title(self):
@@ -356,58 +323,7 @@ class Video():
                                       str(self.index).zfill(2), self.get_date())
 
 
-    # <Video> -------------------------------------------------------------- //
-    def get_url(self, choice):
-        '''
-        Finds download urls for sd and hd versions
-        '''
-        self.button().click()
-        time.sleep(1)
-
-        WebDriverWait(DRIVER, 30).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//*[contains(text(), 'Download original')]")
-            )
-        )
-        time.sleep(1)
-
-        DRIVER.find_element_by_xpath(
-            "//*[contains(text(), 'Download original')]"
-        ).click()
-
-        WebDriverWait(DRIVER, 30).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//select[@name='video-one-files']")
-            )
-        )
-
-        select = Select(DRIVER.find_element_by_xpath(
-            "//select[@name='video-one-files']"
-        ))
-        select.select_by_index(choice)
-
-        url = DRIVER.find_element_by_xpath(
-            "//a[@class='btn primary medium downloadBtn']"
-        ).get_attribute('href')
-
-        # click cancel button
-        DRIVER.find_element_by_xpath(
-            "//a[@class='btn white medium']"
-        ).click()
-
-        return url
-
-    # <Video> -------------------------------------------------------------- //
-    #def download(self, qchoice):
-        """
-        Clicks and selects quality, then downloading video
-        """
-    #    download_file(self.get_url(qchoice), self)
-    #    time.sleep(2)
-
-
-
-
+#TODO: make this as class/static method
 # -------------------------------------------------------------------------- //
 def get_content_len(url):
     '''
@@ -450,7 +366,7 @@ def get_courses():
     )
     containers = DRIVER.find_elements_by_xpath(("//span[@role='gridcell']"))
 
-    for crs in containers: 
+    for crs in containers:
         COURSES.append(Course(crs))
 
 
@@ -485,8 +401,8 @@ def check_dir(path):
         os.chdir(path)
     except IOError as err:
         if err.errno == errno.EEXIST:
-            print('Downloading to {}'.format(path))
             os.chdir(path)
+    print('Downloading to {}'.format(path))
 
 
 # -------------------------------------------------------------------------- //
@@ -505,11 +421,8 @@ def main():
     """
     Main program
     """
-    print('\n┌───────────────────────────────────────────┐')
-    print('│  LectureHook for Echo360                  │')
-    print('└───────────────────────────────────────────┘\n')
-
-    print('Downloading to {}'.format(ARGS.root))
+    print('\nLectureHook for Echo360')
+    print('root folder: {}'.format(ARGS.root))
     launch_page_echo()
     get_courses()
     print_menu()
@@ -540,14 +453,14 @@ if __name__ == "__main__":
     #CONFIG.read('courses.ini')
 
     # set browser options
-    options = Options()
-    
+    OPTIONS = Options()
+
     if not ARGS.window:
-        options.add_argument('--headless')
+        OPTIONS.add_argument('--headless')
     #options.add_argument('--disable-gpu')
-    prefs = {'prompt_for_download': False}
-    options.add_experimental_option('prefs', prefs)
-    DRIVER = Chrome(DVR_PATH, options=options)
+    PREFS = {'prompt_for_download': False}
+    OPTIONS.add_experimental_option('prefs', PREFS)
+    DRIVER = Chrome(DVR_PATH, options=OPTIONS)
 
     # global structs for ease of access
     COURSES = []
