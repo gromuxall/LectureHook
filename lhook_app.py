@@ -34,7 +34,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-
+from tqdm.utils import _term_move_up
 
 def slow_down(func):
     '''
@@ -210,11 +210,17 @@ class Course():
                 vid_urls = [(vid, vid.sd_link) for vid in self.lectures]
             else:
                 vid_urls = [(vid, vid.hd_link) for vid in self.lectures]
+            #pbar = tqdm(total=len(self.lectures), initial=0, position=0, ncols=90,
+            #            bar_format='{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 futures = []
-                for v_url in vid_urls:
-                    futures.append(executor.submit(download_file, entry=v_url))
-                #for future in concurrent.futures.as_completed(futures):
+                tasks = []
+                for vid in self.lectures:
+                    tasks.append(Task(vid))
+                for task in tasks:
+                    futures.append(executor.submit(task.download))
+                #for _ in concurrent.futures.as_completed(futures):
+                #    pbar.update(1)
         else:
             vid = self.lectures[choice-1]
             if qchoice == 0:
@@ -223,7 +229,28 @@ class Course():
                 download_file((vid, vid.hd_link))
 
 
+class Task():
+    
+    def __init__(self, vid):
+        self.vid = vid
+        self.length = get_content_len(vid.sd_link) #TODO: big NO-NO, using sd_link as a sample!
+        self.url = vid.sd_link
+        text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
+        self.pbar = tqdm(total=int(int(self.length)/8192), initial=0, unit='B',
+                    position=vid.index, desc=text, leave=True, ncols=90,
+                    bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        self.pbar.update(0)
 
+    def download(self):
+        with DRIVER.request('GET', self.url, stream=True) as res:
+            res.raise_for_status()
+            text = 'lec{}.mp4'.format(str(self.vid.index).zfill(2))
+
+            with open('{}.mp4'.format(self.vid.vid_title()), 'wb') as file:
+                for chunk in res.iter_content(chunk_size=8192):
+                    self.pbar.update(1)
+                    file.write(chunk)
+            #self.pbar.close()
 
 
 # -------------------------------------------------------------------------- //
@@ -235,26 +262,19 @@ def download_file(entry):
     length = get_content_len(url)
     with DRIVER.request('GET', url, stream=True) as res:
         res.raise_for_status()
-        #print('\n─────────────────────────────────────────────')
-        #print(vid.header_line())
-        #print(vid.lecture_line())
-        #prog_bar = Bar('{}.mp4'.format(vid.vid_title()), max=int(length)/8192,
-        #               fill='▓', suffix='%(percent)d%%')
         text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
         pbar = tqdm(total=int(int(length)/8192), initial=0, unit='B',
                     position=vid.index, desc=text, leave=False, ncols=90,
-                    bar_format='{desc} {percentage:3.0f}%|{bar}|{r_bar}')
+                    bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
 
         with open('{}.mp4'.format(vid.vid_title()), 'wb') as file:
             for chunk in res.iter_content(chunk_size=8192):
                 pbar.update(1)
                 file.write(chunk)
-        
-        tqdm.write('{} finished downloading.'.format(vid.vid_title()))
-        
+
+        #tqdm.write('{} finished downloading.'.format(vid.vid_title()))
+        #tqdm.write(_term_move_up() + '\r')
         pbar.close()
-        
-        #return 'lec{} downloaded'.format(vid.index)
 
 
 class Video():
@@ -485,11 +505,9 @@ def main():
     """
     Main program
     """
-    print('   __     __  __                               ')
-    print('  / /    / /_/ /    LectureHook                ')
-    print(' / /__  / __  /     ░░▒▒▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ')
-    print('/____/ /_/ /_/      Part of the Hook® Suite    ')
-    print('\n───────────────────────────────────────────\n')
+    print('\n┌───────────────────────────────────────────┐')
+    print('│  LectureHook for Echo360                  │')
+    print('└───────────────────────────────────────────┘\n')
 
     print('Downloading to {}'.format(ARGS.root))
     launch_page_echo()
