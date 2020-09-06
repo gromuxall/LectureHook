@@ -100,41 +100,6 @@ class Course():
         return self.crs_code + ' ' + self.crs_num + ' - ' + self.title
 
     # <Course> ------------------------------------------------------------- //
-    def term_enum(self):
-        """
-        Return numerical representation of semester
-        order for ease of sorting
-        """
-        if self.term == 'Spring':
-            return 1
-        if self.term == 'Summer':
-            return 2
-        return 3
-
-    # <Course> ------------------------------------------------------------- //
-    def folder_name(self):
-        return self.crs_code + self.crs_num
-
-    # <Course> ------------------------------------------------------------- //
-    def goto_course(self):
-        """
-        Changes active driver window to chosen course
-        """
-        DRIVER.get(self.url)
-        time.sleep(2) # TODO change this
-        
-        check_dir(self.folder_name())
-        self.fill_lectures()
-
-    
-    # <Course> ------------------------------------------------------------- //
-    def menu_line(self):
-        """
-        Provides a pretty formatted string for the menu
-        """
-        title_str = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
-        return title_str.ljust(42) + (self.crn).ljust(20)
-
     @staticmethod
     def split_link(string):
         '''
@@ -143,16 +108,58 @@ class Course():
         return string.get_attribute('value').split(' || ')[0]
 
     # <Course> ------------------------------------------------------------- //
-    def fill_lectures(self):
-        """
-        Get lecture elements
-        """
+    @staticmethod
+    def check_dir(path):
+        '''
+        Check if directory exists
 
-        # wait for elements to appear
-        WebDriverWait(DRIVER, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
-        # TODO: have rows equal the webdriverwait
-        rows = DRIVER.find_elements_by_xpath("//div[contains(@class, 'class-row')]")
+        True:
+           changes to chosen directory
+
+        False:
+            creates directory and changes to it
+        '''
+        try:
+            os.mkdir(path)
+            os.chdir(path)
+        except IOError as err:
+            if err.errno == errno.EEXIST:
+                os.chdir(path)
+        print('Downloading to {}'.format(path))
+
+    # <Course> ------------------------------------------------------------- //
+    def folder_name(self):
+        '''
+        Return string representation of folder name
+        '''
+        return self.crs_code + self.crs_num
+
+    # <Course> ------------------------------------------------------------- //
+    def goto_course(self):
+        '''
+        Changes active driver window to chosen course
+        '''
+        DRIVER.get(self.url)
+        time.sleep(2) # TODO change this
+
+        Course.check_dir(self.folder_name())
+        self.fill_lectures()
+
+    # <Course> ------------------------------------------------------------- //
+    def menu_line(self):
+        '''
+        Provides a pretty formatted string for the menu
+        '''
+        title_str = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
+        return title_str.ljust(42) + (self.crn).ljust(20)
+
+    # <Course> ------------------------------------------------------------- //
+    def fill_lectures(self):
+        '''
+        Get lecture elements
+        '''
+        rows = WebDriverWait(DRIVER, 30).until(
+            elements_with_xpath("//div[@class='class-row']"))
         
         for idx, row in enumerate(rows):
             title = row.find_element_by_class_name('header').text
@@ -235,7 +242,28 @@ class Course():
         else:
             vid = self.lectures[choice-1]
             Task(vid, qchoice).download()
+'''
+# wait for elements to appear
+rows = WebDriverWait(DRIVER, 30).until(
+    EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
+'''
+class elements_with_xpath(object):
+    '''
+    An expectation for checking that an element is present and can
+    return multiple elements
 
+    locator - used to find the element
+    returns a list of WebElements with the specified xpath
+    '''
+    def __init__(self, xpath):
+        self.xpath = xpath
+
+    def __call__(self, driver):
+        element = driver.find_element_by_xpath(self.xpath)
+        print(element)
+        if element:
+            return driver.find_elements_by_xpath(self.xpath)
+        return False
 
 class Task():
     '''
@@ -384,24 +412,6 @@ def print_menu():
     COURSES[choice].goto_course()
 
 
-# -------------------------------------------------------------------------- //
-def check_dir(path):
-    '''
-    Check if directory exists
-
-    on True:
-       changes to chosen directory
-
-    on False:
-        creates directory and changes to it
-    '''
-    try:
-        os.mkdir(path)
-        os.chdir(path)
-    except IOError as err:
-        if err.errno == errno.EEXIST:
-            os.chdir(path)
-    print('Downloading to {}'.format(path))
 
 
 # -------------------------------------------------------------------------- //
