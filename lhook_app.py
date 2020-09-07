@@ -1,65 +1,39 @@
 #!/usr/bin/env python3
-"""
+'''
     LectureHook
 
     Steven Madonna
-    smadon3@uic.edu
+    stevenmmadonna@gmail.com
 
-    TODO:
-        - pickle session to file and load to avoid login
-        - make prompt to fill config file
-
-"""
-import configparser
+'''
 import sys
 import time
 import os
 import os.path
-import glob
 import calendar as cal
 import argparse
-import functools
 import logging
 import errno
 import pickle
-import yaml
-from enum import Enum
-from tqdm import tqdm
-from js import *
-from waits import elements_with_xpath, elements_by_length 
 import concurrent.futures
+from enum import Enum
 from secrets import USERID, EMAIL, PASS, DVR_PATH
-from seleniumrequests import Chrome
-from progress.spinner import Spinner
-from progress.bar import Bar
+import yaml
+from tqdm import tqdm
 from simple_term_menu import TerminalMenu
-#from selenium import webdriver
+
+from seleniumrequests import Chrome
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from tqdm.utils import _term_move_up
 
-def slow_down(func):
-    '''
-    Sleep 1 second before calling the function
-    '''
-    @functools.wraps(func)
-    def wrapper_slow_down(*args, **kwargs):
-        if len([i for i in glob.glob('*.crdownload')]) > 2:
-            spinner = Spinner('MAX downloading three videos  ')
-            while len([i for i in glob.glob('*.crdownload')]) > 2:
-                spinner.next()
-            #rename_files()
-        return func(*args, **kwargs)
-    return wrapper_slow_down
+from waits import elements_with_xpath, elements_by_length
+from js import CLICK_ALL_FUNC, CLICK_ALL_BTNS, CLICK_ALL_LINKS, FILTER_LIST_FUNC
 
 
 class ElementNotFound(Exception):
-    """
-    Exception raised for error in finding element
-    """
-
+    '''Exception raised for error in finding element'''
     def __init__(self, element, message="Element not found"):
         self.element = element
         self.message = message
@@ -67,18 +41,64 @@ class ElementNotFound(Exception):
 
 
 class Quality(Enum):
-    '''
-    Integer representing position of quality in dropdown options
-    for select
+    '''Integer representing position of quality in dropdown options
+       for select
     '''
     SD = 0
     HD = 1
 
 
+class App():
+    '''Wrapper class for configuration'''
+    _config = {
+        'username': '',
+        'password': '',
+        'root': '',
+        'driver': '',
+        'site': 'https://echo360.org/courses',
+    }
+    _setters = ['username', 'password', 'root', 'driver']
+
+    # <App> ---------------------------------------------------------------- //
+    def __init__(self):
+        try:
+            with open('config.yaml') as handle:
+                App._config = yaml.load(handle, Loader=yaml.FullLoader)
+        except FileNotFoundError:
+            pass
+
+    # <App> ---------------------------------------------------------------- //
+    @staticmethod
+    def get(name):
+        '''Get specified config value'''
+        return App._config[name]
+
+    # <App> ---------------------------------------------------------------- //
+    @staticmethod
+    def set(name, value):
+        '''Set specified config value and save state to yaml'''
+        if name in App._setters:
+            App._config[name] = value
+
+            with open('config.yaml', 'w') as handle:
+                yaml.dump(App._config, handle)
+        else:
+            raise NameError('Name not accepted in set() method')
+
+    # <App> ---------------------------------------------------------------- //
+    @staticmethod
+    def check_root_path():
+        '''Checks if path exists and changes to that directory if so'''
+        # TODO: Check yaml file for root path, also, loop until root
+        #       path is a valid one
+        if not os.path.isdir(ARGS.root):
+            print('ERROR: the path {} does not exist'.format(ARGS.root))
+
+        os.chdir(ARGS.root)
+
+
 class Course():
-    '''
-    Contains all info and methods for courses scraped from Echo360
-    '''
+    '''Contains all info and methods for courses scraped from Echo360'''
     courses = []
 
     # <Course> ------------------------------------------------------------- //
@@ -99,7 +119,7 @@ class Course():
 
     # <Course> ------------------------------------------------------------- //
     def __str__(self):
-        return '{}{} - {}'.format(self.crs_code, self.crs_num, self.title)
+        return self.long_name()
 
     # <Course> ------------------------------------------------------------- //
     @staticmethod
@@ -150,7 +170,7 @@ class Course():
         Return long string representation of course
         '''
         return '{} - {}'.format(self.short_name(), self.title)
-    
+
     # <Course> ------------------------------------------------------------- //
     def menu_line(self):
         '''
@@ -250,10 +270,7 @@ class Video():
         self.title = title
         self.date = date
         self.index = index
-        self.links = {
-            'SD': '',
-            'HD': ''
-            }
+        self.links = {'SD': '', 'HD': ''}
 
     # <Video> -------------------------------------------------------------- //
     def get_content_len(self, quality):
@@ -332,33 +349,16 @@ class Task():
         return self.vid.index
 
 
-# -------------------------------------------------------------------------- //
-def launch_page_echo():
-    '''
-    Navigates to Echo360 site with WebDriver and loads previous
-    WebDriver session if there is one
-    '''
-    DRIVER.get('https://echo360.org/courses')
-    email_input = WebDriverWait(DRIVER, 10).until(
-        EC.presence_of_element_located((By.XPATH, "//input[@name='email']"))
-    )
-    email_input.send_keys(EMAIL)
-    email_input.submit()
-
-    DRIVER.find_element_by_xpath("//input[@id='UserID']").send_keys(USERID)
-    password = DRIVER.find_element_by_xpath("//input[@id='password']")
-    password.send_keys(PASS)
-    password.submit()
-    print(MESSAGES['sign_in'])
-
 
 # -------------------------------------------------------------------------- //
 def fill_courses():
-    '''
-    Get list of courses
-    '''
+    '''Get list of courses'''
     containers = WebDriverWait(DRIVER, 10).until(
         elements_with_xpath("//span[@role='gridcell']"))
+
+    with open('cookies.pickle', 'wb') as file_handle:
+        pickle.dump(DRIVER.get_cookies(), file_handle,
+                    protocol=pickle.HIGHEST_PROTOCOL)
 
     for crs in containers:
         Course.courses.append(Course(crs))
@@ -380,10 +380,37 @@ def check_root_path():
     '''
     Checks if path exists and changes to that directory if so
     '''
+    # TODO: Check yaml file for root path, also, loop until root
+    #       path is a valid one
     if not os.path.isdir(ARGS.root):
         print('ERROR: the path {} does not exist'.format(ARGS.root))
 
     os.chdir(ARGS.root)
+
+
+# -------------------------------------------------------------------------- //
+def load_session():
+    '''Loads cookies into Selenium session'''
+    DRIVER.get(App.get('site'))
+
+    try:
+        with open('cookies.pickle', 'rb') as cookie_handle:
+            cookies = pickle.load(cookie_handle)
+        for cookie in cookies:
+            DRIVER.add_cookie(cookie)
+        DRIVER.get(App.get('site'))
+        DRIVER.get(App.get('site'))
+    except Exception as e:
+        print(MESSAGES['sign_in'])
+        email_input = WebDriverWait(DRIVER, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@name='email']")))
+        email_input.send_keys(EMAIL)
+        email_input.submit()
+
+        DRIVER.find_element_by_xpath("//input[@id='UserID']").send_keys(USERID)
+        password = DRIVER.find_element_by_xpath("//input[@id='password']")
+        password.send_keys(PASS)
+        password.submit()
 
 
 # -------------------------------------------------------------------------- //
@@ -401,7 +428,8 @@ def main():
     Main program
     '''
     print(MESSAGES['intro'], MESSAGES['root'])
-    launch_page_echo()
+    load_session()
+    #launch_page_echo()
     fill_courses()
     print_menu()
 
@@ -417,17 +445,10 @@ if __name__ == "__main__":
     PARSER.add_argument('-l', '--log', action='store_true', help='debug logging')
     ARGS = PARSER.parse_args()
 
-    try:
-        with open('config.yaml') as handle:
-            CONFIG = yaml.load(handle, Loader=yaml.FullLoader)
-    except FileNotFoundError:
-        with open('config.yaml', 'w') as handle:
-            pass
-    
     # TODO: if no root path
     check_root_path()
-
     LOGGER = logging.getLogger('lhook_logger')
+    
     OPTIONS = Options()
 
     if not ARGS.window:
@@ -439,6 +460,7 @@ if __name__ == "__main__":
     PREFS = {'prompt_for_download': False}
     OPTIONS.add_experimental_option('prefs', PREFS)
     DRIVER = Chrome(DVR_PATH, options=OPTIONS)
+    
 
     # msg dictionary for laziness
     MESSAGES = {
@@ -453,7 +475,7 @@ if __name__ == "__main__":
     # begin program
     try:
         main()
-    #except Exception as err:
+    except Exception as err:
         print(MESSAGES['exit'])
         LOGGER.info(err)
     finally:
