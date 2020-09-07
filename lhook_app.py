@@ -26,6 +26,7 @@ import yaml
 from enum import Enum
 from tqdm import tqdm
 from js import *
+from waits import elements_with_xpath, elements_by_length 
 import concurrent.futures
 from secrets import USERID, EMAIL, PASS, DVR_PATH
 from seleniumrequests import Chrome
@@ -158,59 +159,32 @@ class Course():
         '''
         Get lecture elements
         '''
-        rows = WebDriverWait(DRIVER, 30).until(
+        wait = WebDriverWait(DRIVER, 10)
+        rows = wait.until(
             elements_with_xpath("//div[@class='class-row']"))
-        
+
         for idx, row in enumerate(rows):
-            title = row.find_element_by_class_name('header').text
-            date = row.find_element_by_xpath(".//span[@class='date']").text
-            self.lectures.append(Video(self, title, date, idx))
+            self.lectures.append(Video(
+                self,
+                row.find_element_by_class_name('header').text,
+                row.find_element_by_xpath(".//span[@class='date']").text,
+                idx))
 
-        '''here is where I should extract all the video links'''
-        DRIVER.execute_script(
-            '''
-            {}
+        num_lecs = len(self.lectures)
 
-            btns = document.querySelectorAll("div[class*='courseMediaIndicator capture']")
-            click_all(btns)
-            '''.format(CLICK_ALL)
-            )
+        # find and click all btns to bring up video options
+        DRIVER.execute_script('{}{}'.format(CLICK_ALL_FUNC, CLICK_ALL_BTNS))
 
-        '''move this to a wait function and make decorator for timing and killing'''
-        tries = 30
-        while tries > 0:
-            try:
-                li_elems = DRIVER.find_elements_by_xpath("//div[@class='menu-items']/ul/li/a")
-                if (len(li_elems) / 3) == len(self.lectures):
-                    break
-            except Exception as e:
-                #print('waiting....{}'.format(e))
-                time.sleep(1)
-                tries -= 1
-        
-        DRIVER.execute_script(
-            '''
-            {}{}
+        # there are three list elements, so multiply num_lecs by three
+        wait.until(elements_by_length(
+            "//div[@class='menu-items']/ul/li/a", num_lecs * 3))
 
-            li_elems = document.querySelectorAll(".menu-items ul li a");
-            dwns = filter_list(li_elems)
-            click_all(dwns)
-            '''.format(CLICK_ALL, FILTER_LIST)
-            )
-        
-        '''move this to a wait function and make decorator for timing and killing'''
-        selects = []
-        tries = 30
-        while tries > 0:
-            try:
-                selects = DRIVER.find_elements_by_xpath(
-                        "//select[@name='video-one-files']")
-                if len(selects) == len(self.lectures):
-                    break
-            except Exception as e:
-                print('len(selects): {}, len(self.lectures): {}'.format(len(selects), len(self.lectures)))
-                time.sleep(1)
-                tries -= 1
+        # find and click all 'Download Original' links
+        DRIVER.execute_script('{}{}{}'.format(CLICK_ALL_FUNC, FILTER_LIST_FUNC,
+                                              CLICK_ALL_LINKS))
+
+        selects = wait.until(elements_by_length(
+            "//select[@name='video-one-files']", num_lecs))
 
         for sel, vid in zip(selects, self.lectures):
             ops = sel.find_elements_by_xpath("./option")
@@ -242,28 +216,7 @@ class Course():
         else:
             vid = self.lectures[choice-1]
             Task(vid, qchoice).download()
-'''
-# wait for elements to appear
-rows = WebDriverWait(DRIVER, 30).until(
-    EC.presence_of_element_located((By.XPATH, "//div[@class='class-row']")))
-'''
-class elements_with_xpath(object):
-    '''
-    An expectation for checking that an element is present and can
-    return multiple elements
 
-    locator - used to find the element
-    returns a list of WebElements with the specified xpath
-    '''
-    def __init__(self, xpath):
-        self.xpath = xpath
-
-    def __call__(self, driver):
-        element = driver.find_element_by_xpath(self.xpath)
-        print(element)
-        if element:
-            return driver.find_elements_by_xpath(self.xpath)
-        return False
 
 class Task():
     '''
