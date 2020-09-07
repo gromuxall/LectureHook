@@ -77,9 +77,10 @@ class Quality(Enum):
 
 class Course():
     '''
-    Contains all info and methods for courses
-    scraped from Echo360
+    Contains all info and methods for courses scraped from Echo360
     '''
+    courses = []
+
     # <Course> ------------------------------------------------------------- //
     def __init__(self, course):
         items = course.text.split('\n')
@@ -98,7 +99,15 @@ class Course():
 
     # <Course> ------------------------------------------------------------- //
     def __str__(self):
-        return self.crs_code + ' ' + self.crs_num + ' - ' + self.title
+        return '{}{} - {}'.format(self.crs_code, self.crs_num, self.title)
+
+    # <Course> ------------------------------------------------------------- //
+    @staticmethod
+    def sort_courses():
+        '''
+        Sort the static variable list courses
+        '''
+        Course.courses = sorted(Course.courses, key=lambda x: x.crs_num)
 
     # <Course> ------------------------------------------------------------- //
     @staticmethod
@@ -126,14 +135,28 @@ class Course():
         except IOError as err:
             if err.errno == errno.EEXIST:
                 os.chdir(path)
-        print('Downloading to {}'.format(path))
+        print('Downloading to {}'.format(path)) #TODO change this
 
     # <Course> ------------------------------------------------------------- //
-    def folder_name(self):
+    def short_name(self):
         '''
-        Return string representation of folder name
+        Return short string representation of course
         '''
-        return self.crs_code + self.crs_num
+        return '{}{}'.format(self.crs_code, self.crs_num)
+
+    # <Course> ------------------------------------------------------------- //
+    def long_name(self):
+        '''
+        Return long string representation of course
+        '''
+        return '{} - {}'.format(self.short_name(), self.title)
+    
+    # <Course> ------------------------------------------------------------- //
+    def menu_line(self):
+        '''
+        Provides a pretty formatted string for the menu
+        '''
+        return self.long_name().ljust(42) + (self.crn).ljust(20)
 
     # <Course> ------------------------------------------------------------- //
     def goto_course(self):
@@ -141,18 +164,21 @@ class Course():
         Changes active driver window to chosen course
         '''
         DRIVER.get(self.url)
-        time.sleep(2) # TODO change this
+        time.sleep(2) # TODO change this, add a wait here
 
-        Course.check_dir(self.folder_name())
+        Course.check_dir(self.short_name())
         self.fill_lectures()
 
     # <Course> ------------------------------------------------------------- //
-    def menu_line(self):
+    def extract_links(self, selects):
         '''
-        Provides a pretty formatted string for the menu
+        Extracts the SD and HD version links from options in the passed
+        in list of selects and fills those values in for the video objects
         '''
-        title_str = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
-        return title_str.ljust(42) + (self.crn).ljust(20)
+        for sel, vid in zip(selects, self.lectures):
+            ops = sel.find_elements_by_xpath("./option")
+            vid.links['SD'] = Course.split_link(ops[Quality.SD.value])
+            vid.links['HD'] = Course.split_link(ops[Quality.HD.value])
 
     # <Course> ------------------------------------------------------------- //
     def fill_lectures(self):
@@ -185,77 +211,30 @@ class Course():
 
         selects = wait.until(elements_by_length(
             "//select[@name='video-one-files']", num_lecs))
-
-        for sel, vid in zip(selects, self.lectures):
-            ops = sel.find_elements_by_xpath("./option")
-            vid.links['SD'] = Course.split_link(ops[Quality.SD.value])
-            vid.links['HD'] = Course.split_link(ops[Quality.HD.value])
+        self.extract_links(selects)
 
         vid_names = [v.date for v in self.lectures]
-        vid_names.insert(0, 'all videos')
+        vid_names.insert(0, 'All Lectures')
 
-        name = self.crs_code + ' ' + self.crs_num + ' - ' + self.title
-        terminal_menu = TerminalMenu(menu_entries=vid_names, title=name)
-        choice = terminal_menu.show()
+        lec_choice = TerminalMenu(menu_entries=vid_names,
+                                  title=self.long_name()).show()
 
-        quality_menu = TerminalMenu(menu_entries=['SD', 'HD'],
-                                    title='Quality')
-        qchoice = quality_menu.show()
+        qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
+                                  title='Quality').show()
 
-
-        if choice == 0: # Chose 'All Videos'
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        if lec_choice == 0: # Chose 'All Videos'
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=3) as executor:
                 futures = []
                 tasks = []
                 for vid in self.lectures:
-                    tasks.append(Task(vid, qchoice))
+                    tasks.append(Task(vid, qty_choice))
                 for task in tasks:
                     futures.append(executor.submit(task.download))
                 #for ret in concurrent.futures.as_completed(futures):
                 #    #tiasks[ret].finish_
         else:
-            vid = self.lectures[choice-1]
-            Task(vid, qchoice).download()
-
-
-class Task():
-    '''
-    Object for initializing progress bar for downloads and performing
-    the download upon call
-    '''
-    def __init__(self, vid, quality):
-        self.vid = vid
-        self.url = vid.url(quality)
-        self.length = vid.get_content_len(quality)
-        text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
-        self.pbar = tqdm(total=int(int(self.length)/8192), initial=0,
-                         position=vid.index, desc=text, leave=False,
-                         ncols=90, bar_format='{desc} {percentage:3.0f}\
-                                               %|{bar}| {n_fmt}/{total_fmt}')
-        self.pbar.update(0)
-
-    # <Task> --------------------------------------------------------------- //
-    def finish_msg(self):
-        '''
-        Display confirmation message
-        '''
-        self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()), 
-                          pos=self.vid.index)
-
-    # <Task> --------------------------------------------------------------- //
-    def download(self):
-        '''
-        Stream downloads file pointed to by self.url and returns index
-        '''
-        with DRIVER.request('GET', self.url, stream=True) as res:
-            res.raise_for_status()
-
-            with open('{}.mp4'.format(self.vid.vid_title()), 'wb') as file:
-                for chunk in res.iter_content(chunk_size=8192):
-                    self.pbar.update(1)
-                    file.write(chunk)
-                self.finish_msg()
-        return self.vid.index
+            Task(self.lectures[lec_choice-1], qty_choice).download()
 
 
 class Video():
@@ -313,14 +292,52 @@ class Video():
                                       str(self.index).zfill(2), self.get_date())
 
 
+class Task():
+    '''
+    Object for initializing progress bar for downloads and performing
+    the download upon call
+    '''
+    def __init__(self, vid, quality):
+        self.vid = vid
+        self.url = vid.url(quality)
+        self.length = vid.get_content_len(quality)
+        text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
+        self.pbar = tqdm(total=int(int(self.length)/8192), initial=0,
+                         position=vid.index, desc=text, leave=False,
+                         ncols=90, bar_format='{desc} {percentage:3.0f}\
+                                               %|{bar}| {n_fmt}/{total_fmt}')
+        self.pbar.update(0)
+
+    # <Task> --------------------------------------------------------------- //
+    def finish_msg(self):
+        '''
+        Display confirmation message
+        '''
+        self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()),
+                          pos=self.vid.index)
+
+    # <Task> --------------------------------------------------------------- //
+    def download(self):
+        '''
+        Stream downloads file pointed to by self.url and returns index
+        '''
+        with DRIVER.request('GET', self.url, stream=True) as res:
+            res.raise_for_status()
+
+            with open('{}.mp4'.format(self.vid.vid_title()), 'wb') as file:
+                for chunk in res.iter_content(chunk_size=8192):
+                    self.pbar.update(1)
+                    file.write(chunk)
+                self.finish_msg()
+        return self.vid.index
+
+
 # -------------------------------------------------------------------------- //
 def launch_page_echo():
-    """
-    Navigates to Echo360 site
-
-    TODO:
-        - check config file for values and prompt if no values
-    """
+    '''
+    Navigates to Echo360 site with WebDriver and loads previous
+    WebDriver session if there is one
+    '''
     DRIVER.get('https://echo360.org/courses')
     email_input = WebDriverWait(DRIVER, 10).until(
         EC.presence_of_element_located((By.XPATH, "//input[@name='email']"))
@@ -335,36 +352,27 @@ def launch_page_echo():
     print(MESSAGES['sign_in'])
 
 
-
 # -------------------------------------------------------------------------- //
-def get_courses():
-    """
+def fill_courses():
+    '''
     Get list of courses
-    """
-    WebDriverWait(DRIVER, 10).until(
-        EC.presence_of_element_located((By.XPATH, "//span[@role='gridcell']"))
-    )
-    containers = DRIVER.find_elements_by_xpath(("//span[@role='gridcell']"))
+    '''
+    containers = WebDriverWait(DRIVER, 10).until(
+        elements_with_xpath("//span[@role='gridcell']"))
 
     for crs in containers:
-        COURSES.append(Course(crs))
+        Course.courses.append(Course(crs))
+    Course.sort_courses()
 
 
 # -------------------------------------------------------------------------- //
 def print_menu():
-    """
+    '''
     Sort and print course list, then return choice
-    """
-    global COURSES
-    COURSES = sorted(COURSES, key=lambda x: x.crs_num)
-    crs_names = [z.menu_line() for z in COURSES]
-
-    terminal_menu = TerminalMenu(crs_names)
-    choice = terminal_menu.show()
-
-    COURSES[choice].goto_course()
-
-
+    '''
+    course_names = [z.menu_line() for z in Course.courses]
+    choice = TerminalMenu(course_names).show()
+    Course.courses[choice].goto_course()
 
 
 # -------------------------------------------------------------------------- //
@@ -394,7 +402,7 @@ def main():
     '''
     print(MESSAGES['intro'], MESSAGES['root'])
     launch_page_echo()
-    get_courses()
+    fill_courses()
     print_menu()
 
 
@@ -432,9 +440,6 @@ if __name__ == "__main__":
     OPTIONS.add_experimental_option('prefs', PREFS)
     DRIVER = Chrome(DVR_PATH, options=OPTIONS)
 
-
-    COURSES = []
-
     # msg dictionary for laziness
     MESSAGES = {
         'intro': '\nLectureHook for Echo360',
@@ -448,7 +453,7 @@ if __name__ == "__main__":
     # begin program
     try:
         main()
-    except Exception as err:
+    #except Exception as err:
         print(MESSAGES['exit'])
         LOGGER.info(err)
     finally:
