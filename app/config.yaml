@@ -1,0 +1,6 @@
+email: 
+password: 
+headless: false
+multi: false
+driver_path: 
+url: https://echo360.org/courses
