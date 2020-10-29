@@ -1,13 +1,9 @@
-
 import os
+import sys
 import yaml
 import logging
-import requests
 import pickle
-from lxml import html
 from functools import wraps
-from shutil import which
-from zipfile import ZipFile
 from seleniumrequests import Chrome
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -22,9 +18,10 @@ class App:
     '''Wrapper class for configuration'''
     _config = {
         'email': None,
+        'password': None,
         'driver_path': None,
         'multi': False, # multithreading turned off by default
-        'headless': True,
+        'headless': False,
         'url': 'https://echo360.org/courses',
     }
     #_setters = ['username', 'password', 'root', 'driver', 'multi', 'window',
@@ -45,11 +42,8 @@ class App:
     @staticmethod
     @update
     def first_time_setup():
-        '''Create config.yaml and fill with appropriate values'''
-        # create config file
-        with open('config.yaml', 'w+') as handle:
-                yaml.dump(App._config, handle)
-
+        '''Set up chromedriver and add path to config file'''
+    
         get_chromedriver(chrome_version())
         App._config['driver_path'] = '{}/chromedriver'.format(os.getcwd())
 
@@ -69,6 +63,11 @@ class App:
             with open('config.yaml', 'r') as handle:
                 App._config = yaml.full_load(handle)
         except FileNotFoundError:
+            # create config file
+            with open('config.yaml', 'w+') as handle:
+                    yaml.dump(App._config, handle)
+
+        if not App._config['driver_path']:
             App.first_time_setup()
 
         App.setup_driver()
@@ -87,6 +86,11 @@ class App:
         
         if not url:
             url = App._config['url']
+
+        if not App._config['driver_path']:
+            print('ERROR: Driver path not set! Either set manually in '
+                  'config.yaml or delete config.yaml and re-run')
+            sys.exit()
 
         App.driver = Chrome(executable_path=App._config['driver_path'], options=opt)
         App.driver.get(App._config['url'])
@@ -122,19 +126,21 @@ class App:
     def setup_session():
         '''Take email and password to establish session'''
         print('No session present, sign in (this should happen rarely):')
-        App._config['email'] = input('Enter school email address: ')
-        password = input('Enter password: ')
         
-        print('Signing in and setting up persistent session...')
-        email_input = WebDriverWait(App.driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@name='email']")))
-        email_input.send_keys(App._config['email'])
-        email_input.submit()
+        if not App._config['email']:
+            App._config['email'] = input('Enter school email address: ')
+            App._config['password'] = input('Enter password: ')
+            print('Signing in and setting up persistent session...')
+        
+            email_input = WebDriverWait(App.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//input[@name='email']")))
+            email_input.send_keys(App._config['email'])
+            email_input.submit()
 
         user = App._config['email'].split('@')[0]
         App.driver.find_element_by_xpath("//input[@id='UserID']").send_keys(user)
         pbox = App.driver.find_element_by_xpath("//input[@id='password']")
-        pbox.send_keys(password)
+        pbox.send_keys(App._config['password'])
         pbox.submit()
     
     
@@ -158,5 +164,4 @@ class App:
     '''
 
 if __name__ == "__main__":
-    #App.first_time_setup()
     app = App()

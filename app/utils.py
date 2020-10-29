@@ -2,7 +2,6 @@ import platform
 import os
 from zipfile import ZipFile
 from lxml import html
-
 import requests
 
 
@@ -37,14 +36,14 @@ def get_chromedriver(version):
     page = requests.get('https://chromedriver.chromium.org/downloads')
     tree = html.fromstring(page.content)
     ver_num = tree.xpath("//a[contains(text(), 'ChromeDriver {}')]".format(version))
-        
+
     # link may possibly be repeated on page, take first one if so
-    if len(ver_num) > 1:
+    if isinstance(ver_num, list):
         ver_num = ver_num[0]
     
     # extract just the version number
     ver = ver_num.text.split('ChromeDriver ')[1]
-    
+
     # download the chromedriver zip files
     with open('chromedriver.zip', 'wb') as file:
         response = requests.get('https://chromedriver.storage.googleapis.com/{}/chromedriver_linux64.zip'.format(ver))

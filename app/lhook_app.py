@@ -104,7 +104,7 @@ if __name__ == "__main__":
     PARSER.add_argument('-w', '--window', action='store_true', help='show window')
     PARSER.add_argument('-l', '--log', action='store_true', help='debug logging')
     ARGS = PARSER.parse_args()
-    APP = App()
+    APP = App(ARGS)
     '''
         - check for existence of file
         - initialize by creating file if it doesnt exist
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     OPTIONS.add_experimental_option('prefs', PREFS)
     
     # TODO: set this in app
-    DRIVER = Chrome()
+    DRIVER = Chrome(options=OPTIONS)
 
 
     # msg dictionary for laziness
