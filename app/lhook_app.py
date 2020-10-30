@@ -17,6 +17,9 @@ from waits import elements_with_xpath
 from app import App
 from course_video import Course
 
+
+
+
 # -------------------------------------------------------------------------- //
 def fill_courses():
     '''Get list of courses'''
@@ -33,19 +36,38 @@ def fill_courses():
     Course.sort_courses()
 
 
+def clean_exit():
+    '''Exits program gracefully by cleaning up any unfinished
+    files and killing the driver process
+    '''
+    APP.driver.quit()
+    sys.exit()
+
+
 # -------------------------------------------------------------------------- //
-def menu():
+def menu(option):
     '''Sort and print course list, then return choice'''
-    course_names = [z.menu_line() for z in Course.courses]
-    choice = TerminalMenu(course_names).show()
-    Course.courses[choice].goto_course()
+    if option == 'courses':
+        course_names = [z.menu_line() for z in Course.courses]
+        course_names.append('(X) Exit')
+        choice = TerminalMenu(course_names).show()
+        
+        if choice == len(course_names)-1:
+            clean_exit()
+        
+        Course.courses[choice].goto_course()
+    elif option == 'lectures':
+        pass
+
+
+
 
 # -------------------------------------------------------------------------- //
 def main():
     '''Main program'''
     os.chdir(APP.get('download_path'))
     fill_courses()
-    menu()
+    menu('courses')
 
 
 # -------------------------------------------------------------------------- //

@@ -83,10 +83,11 @@ class Course:
         '''
         try:
             os.mkdir(dir_path)
-            os.chdir(dir_path)
+            #os.chdir(dir_path)
         except IOError as err:
-            if err.errno == errno.EEXIST:
-                os.chdir(dir_path)
+            pass
+            #if err.errno == errno.EEXIST:
+            #    os.chdir(dir_path)
 
     # <Course> ------------------------------------------------------------- //
     def short_name(self):
@@ -99,6 +100,11 @@ class Course:
         return '{} - {}'.format(self.short_name(), self.title)
 
     # <Course> ------------------------------------------------------------- //
+    def dir_path(self):
+        '''Return path to this course's folder'''
+        return '{}/{}'.format(App.get('download_path'), self.short_name())
+
+    # <Course> ------------------------------------------------------------- //
     def menu_line(self):
         '''Provides a pretty formatted string for the menu'''
         return self.long_name().ljust(42) + (self.crn).ljust(20)
@@ -107,7 +113,8 @@ class Course:
     def goto_course(self):
         '''Changes active driver window to chosen course'''
         self.driver.get(self.crs_url)
-        Course.check_dir(self.short_name())
+        #Course.check_dir(self.short_name())
+        Course.check_dir(self.dir_path())
         self.fill_lectures()
 
     # <Course> ------------------------------------------------------------- //
@@ -166,7 +173,7 @@ class Course:
         qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
                                   title='Quality').show()
 
-        print('Downloading to {}/{}'.format(App.get('download_path'), self.short_name()))
+        
         if lec_choice == 0: # Chose 'All Videos'
             if App.get('multi'):
                 with concurrent.futures.ThreadPoolExecutor(
