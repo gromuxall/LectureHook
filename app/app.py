@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import NoSuchElementException
 from waits import elements_with_xpath
 from utils import chrome_version, get_chromedriver
 
@@ -19,14 +20,16 @@ class App:
     _config = {
         'email': None,
         'password': None,
-        'driver_path': None,
         'multi': False, # multithreading turned off by default
         'headless': False,
+        'driver_path': None,
+        'download_path': '../Lectures',
         'url': 'https://echo360.org/courses',
     }
     #_setters = ['username', 'password', 'root', 'driver', 'multi', 'window',
     #            'log']
     driver = None
+
     
     # <App> ---------------------------------------------------------------- //
     def update(func):
@@ -70,9 +73,21 @@ class App:
         if not App._config['driver_path']:
             App.first_time_setup()
 
+        App.check_path()
         App.setup_driver()
         App.load_session()
 
+    # <App> ---------------------------------------------------------------- //
+    @staticmethod
+    def check_path():
+        '''Confirms that download_path is a valid path'''
+        path = App._config['download_path']
+        if not os.path.isdir(path):
+            try:
+                os.mkdir(path)
+            except OSError:
+                print('ERROR: cannot create path: {}'.format(path))
+            sys.exit()
 
     # <App> ---------------------------------------------------------------- //
     @staticmethod
@@ -138,7 +153,11 @@ class App:
             email_input.submit()
 
         user = App._config['email'].split('@')[0]
-        App.driver.find_element_by_xpath("//input[@id='UserID']").send_keys(user)
+        try:
+            App.driver.find_element_by_xpath("//input[@id='UserID']").send_keys(user)
+        except NoSuchElementException:
+            print('Email must be incorrect, please change in yaml file')
+            sys.exit()
         pbox = App.driver.find_element_by_xpath("//input[@id='password']")
         pbox.send_keys(App._config['password'])
         pbox.submit()

@@ -1,6 +1,7 @@
 email: 
 password: 
-headless: false
+headless: true
 multi: false
 driver_path: 
+download_path: ../Lectures
 url: https://echo360.org/courses

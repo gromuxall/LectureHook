@@ -60,9 +60,15 @@ class Course:
 
     # <Course> ------------------------------------------------------------- //
     @staticmethod
-    def split_link(string):
+    def clean_link(string):
         '''Utility that splits off url from accompanying information'''
-        return string.get_attribute('value').split(' || ')[0]
+        link = 'https://echo360.org/media/download/{}/video/{}'
+        splits = string.get_attribute('value').split(' || ')
+        code = splits[0]
+        quality = splits[2]
+        print('LINK: {}'.format(link.format(code, quality)))
+        return link.format(code, quality)
+        
 
     # <Course> ------------------------------------------------------------- //
     @staticmethod
@@ -111,8 +117,8 @@ class Course:
         '''
         for sel, vid in zip(selects, self.lectures):
             ops = sel.find_elements_by_xpath("./option")
-            vid.links['SD'] = Course.split_link(ops[Quality.SD.value])
-            vid.links['HD'] = Course.split_link(ops[Quality.HD.value])
+            vid.links['SD'] = Course.clean_link(ops[Quality.SD.value])
+            vid.links['HD'] = Course.clean_link(ops[Quality.HD.value])
 
     # <Course> ------------------------------------------------------------- //
     def fill_lectures(self):
@@ -160,19 +166,24 @@ class Course:
         qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
                                   title='Quality').show()
 
-        print('Downloading to {}/{}'.format(App.get('root'), self.short_name()))
+        print('Downloading to {}/{}'.format(App.get('download_path'), self.short_name()))
         if lec_choice == 0: # Chose 'All Videos'
-            with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=3) as executor:
-                futures = []
-                tasks = []
+            if App.get('multi'):
+                with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=3) as executor:
+                    futures = []
+                    tasks = []
+                    for vid in self.lectures:
+                        tasks.append(Task(vid, qty_choice))
+                    for task in tasks:
+                        futures.append(executor.submit(task.download))
+                    for _ in concurrent.futures.as_completed(futures):
+                        #tasks[ret].finish_msg()
+                        pass
+            else:
                 for vid in self.lectures:
-                    tasks.append(Task(vid, qty_choice))
-                for task in tasks:
-                    futures.append(executor.submit(task.download))
-                for _ in concurrent.futures.as_completed(futures):
-                    #tasks[ret].finish_msg()
-                    pass
+                    Task(vid, qty_choice).download()
+
         else:
             Task(self.lectures[lec_choice-1], qty_choice).download()
 
