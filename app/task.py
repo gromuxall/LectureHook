@@ -15,13 +15,13 @@ class Task():
         if multi:
             self.pbar = tqdm(
                 total=int(int(self.length)/8192), initial=0, position=vid.index,
-                desc=text, leave=False, ncols=90,
+                desc=text, leave=False, ncols=60,
                 bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
             self.pbar.update(0)
         else:
             self.pbar = tqdm(
-                total=int(int(self.length)/8192), initial=0, position=0,
-                desc=text, leave=False, ncols=90,
+                total=int(int(self.length)/8192), initial=0,
+                desc=text, leave=False, ncols=60,
                 bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
             self.pbar.update(0)
 
@@ -30,7 +30,6 @@ class Task():
         '''Display confirmation message'''
         self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()),
                           pos=self.vid.index)
-        print('')
 
     # <Task> --------------------------------------------------------------- //
     def download(self):

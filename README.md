@@ -21,7 +21,7 @@ LectureHook is a command-line tool to download lecture videos from the echo360 c
 
 ## Linux/MacOS
 Clone the repo and run the provided install script:  
-`git clone 'https://github.com/gromuxall/LectureHook.git' && chmod 755 LectureHook/app/install.sh && LectureHook/app/install.sh && source ~/.bashrc`  
+`git clone 'https://github.com/gromuxall/LectureHook.git' && cd LectureHook/app && chmod 755 install.sh && ./install.sh && source ~/.bashrc`  
 
 Now run in your terminal with command:  
 `lecturehook`

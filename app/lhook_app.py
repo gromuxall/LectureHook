@@ -104,7 +104,6 @@ def menu(option, course=None):
 # -------------------------------------------------------------------------- //
 def main():
     '''Main program'''
-    os.chdir(APP.get('download_path'))
     fill_courses()
     menu('courses')
 
