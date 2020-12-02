@@ -3,6 +3,7 @@ import sys
 import yaml
 import logging
 import pickle
+import getpass
 from functools import wraps
 from seleniumrequests import Chrome
 from selenium.webdriver.common.by import By
@@ -144,7 +145,7 @@ class App:
         
         if not App._config['email']:
             App._config['email'] = input('Enter school email address: ')
-            App._config['password'] = input('Enter password: ')
+            App._config['password'] = getpass.getpass(prompt='Enter password: ')
             print('Signing in and setting up persistent session...')
         
             email_input = WebDriverWait(App.driver, 10).until(
