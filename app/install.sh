@@ -14,7 +14,7 @@ exec 3<> run.sh
 
 echo "#!/bin/bash" >&3
 echo "" >&3
-echo "cd ${PWD}"
+echo "cd ${PWD}" >&3
 echo "source env/bin/activate " >&3
 echo "python3 lhook_app.py" >&3
 echo "deactivate" >&3
