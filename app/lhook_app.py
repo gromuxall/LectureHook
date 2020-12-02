@@ -72,11 +72,12 @@ def menu(option, course=None):
         lec_choice = TerminalMenu(menu_entries=vid_names,
                                   title=course.long_name()).show()
 
-        qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
-                                  title='Quality').show()
-
         if lec_choice == 0:
             menu('courses')
+        else:
+            qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
+                                      title='Quality').show()
+        
         if lec_choice == 1: # Chose 'All Videos'
             if App.get('multi'):
                 with concurrent.futures.ThreadPoolExecutor(

@@ -1,5 +1,5 @@
 from tqdm import tqdm
-#from progress.bar import Bar
+from progress.bar import Bar
 
 class Task():
     '''Object for initializing progress bar for downloads and performing
@@ -11,6 +11,7 @@ class Task():
         self.url = vid.url(quality)
         self.length = vid.get_content_len(quality)
         text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
+        
         if multi:
             self.pbar = tqdm(
                 total=int(int(self.length)/8192), initial=0, position=vid.index,
@@ -19,7 +20,8 @@ class Task():
             self.pbar.update(0)
         else:
             self.pbar = tqdm(
-                total=int(int(self.length)/8192), desc=text, leave=True, ncols=90,
+                total=int(int(self.length)/8192), initial=0, position=0,
+                desc=text, leave=False, ncols=90,
                 bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
             self.pbar.update(0)
 
@@ -28,6 +30,7 @@ class Task():
         '''Display confirmation message'''
         self.pbar.display(msg='{} downloaded.'.format(self.vid.vid_title()),
                           pos=self.vid.index)
+        print('')
 
     # <Task> --------------------------------------------------------------- //
     def download(self):
@@ -40,4 +43,4 @@ class Task():
                     self.pbar.update(1)
                     file.write(chunk)
                 self.finish_msg()
-            #self.pbar.close()
+            self.pbar.close()
