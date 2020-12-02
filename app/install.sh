@@ -12,11 +12,9 @@ exec 3<> run.sh
 
 echo "#!/bin/bash" >&3
 echo "" >&3
-echo "DIR=${PWD}" >&3
-echo "" >&3
-echo "source ${DIR}/env/bin/activate " >&3
-echo "python3 ${DIR}/lhook_app.py" >&3
-echo "deactivate"
+echo "source ${PWD}/env/bin/activate " >&3
+echo "python3 ${PWD}/lhook_app.py" >&3
+echo "deactivate" >&3
 
 exec 3>&-
 
