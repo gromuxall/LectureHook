@@ -8,13 +8,17 @@ deactivate
 
 chmod 755 lhook_app.py
 
+RET_DIR=$PWD
+
 exec 3<> run.sh
 
 echo "#!/bin/bash" >&3
 echo "" >&3
-echo "source ${PWD}/env/bin/activate " >&3
-echo "python3 ${PWD}/lhook_app.py" >&3
+echo "cd ${PWD}"
+echo "source env/bin/activate " >&3
+echo "python3 lhook_app.py" >&3
 echo "deactivate" >&3
+echo "cd ${RET_DIR}" >&3
 
 exec 3>&-
 
