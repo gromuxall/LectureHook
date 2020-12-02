@@ -12,12 +12,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
+#import errno
+import concurrent.futures
 from simple_term_menu import TerminalMenu
+from task import Task
 from waits import elements_with_xpath
 from app import App
 from course_video import Course
-
-
 
 
 # -------------------------------------------------------------------------- //
@@ -30,36 +31,73 @@ def fill_courses():
         pickle.dump(APP.driver.get_cookies(), file_handle,
                     protocol=pickle.HIGHEST_PROTOCOL)
 
+    Course.set_driver(APP.driver)
+    
     for crs in containers:
-        Course.courses.append(Course(crs))
-        Course.set_driver(APP.driver)
+        Course.courses.append(Course(crs))   
     Course.sort_courses()
 
 
+# -------------------------------------------------------------------------- //
 def clean_exit():
     '''Exits program gracefully by cleaning up any unfinished
     files and killing the driver process
+
+    TODO: identify and clean up unfinished files
     '''
     APP.driver.quit()
     sys.exit()
 
 
 # -------------------------------------------------------------------------- //
-def menu(option):
+def menu(option, course=None):
     '''Sort and print course list, then return choice'''
     if option == 'courses':
-        course_names = [z.menu_line() for z in Course.courses]
+        course_names = [x.menu_line() for x in Course.courses]
         course_names.append('(X) Exit')
         choice = TerminalMenu(course_names).show()
         
         if choice == len(course_names)-1:
             clean_exit()
-        
-        Course.courses[choice].goto_course()
+
+        Course.courses[choice].goto_course()        
+        menu('lectures', Course.courses[choice])
     elif option == 'lectures':
-        pass
+        # reference Course.sorted_courses[idx].lectures
+        # so you can add checkmark to lecture names
+        vid_names = [v.date for v in course.lectures]
+        vid_names.insert(0, 'Download All Lectures')
+        vid_names.insert(0, '<< Back to Courses')
 
+        lec_choice = TerminalMenu(menu_entries=vid_names,
+                                  title=course.long_name()).show()
 
+        qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
+                                  title='Quality').show()
+
+        if lec_choice == 0:
+            menu('courses')
+        if lec_choice == 1: # Chose 'All Videos'
+            if App.get('multi'):
+                with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=3) as executor:
+                    futures = []
+                    tasks = []
+                    for vid in course.lectures:
+                        tasks.append(Task(vid, qty_choice, True))
+                    for task in tasks:
+                        futures.append(executor.submit(task.download))
+                    for _ in concurrent.futures.as_completed(futures):
+                        pass
+            else:
+                for vid in course.lectures:
+                    Task(vid, qty_choice).download()
+            menu('courses')
+
+        else:
+            Task(course.lectures[lec_choice-1], qty_choice).download()
+            course.lectures[lec_choice-1].mark_dwn()
+            menu('lectures', course)
 
 
 # -------------------------------------------------------------------------- //
@@ -80,43 +118,22 @@ if __name__ == "__main__":
     ARGS = PARSER.parse_args()
     
     APP = App()
-
     LOGGER = logging.getLogger('lhook_logger')
-
-    #OPTIONS = Options()
-
-    #if not ARGS.window:
-    #    OPTIONS.add_argument('--headless')
 
     if ARGS.log:
         logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
-    #PREFS = {'prompt_for_download': False}
-    
-    #OPTIONS.add_experimental_option('prefs', PREFS)
-    
-    # TODO: set this in app
-    #DRIVER = Chrome(options=OPTIONS)
-
-
-    # msg dictionary for laziness
     MESSAGES = {
         'intro': '\nLectureHook for Echo360',
-        #'root': '\nroot folder: {}'.format(ARGS.root),
         'sign_in': 'Signing in...',
         'collab': 'Fetching videos from Blackboard Collaborate',
         'echo': 'Fetching videos from Echo360',
         'exit': 'Exiting'
         }
 
-    # begin program
-    """
     try:
         main()
     except Exception as err:
-        #print(MESSAGES['exit'])
-        LOGGER.info(err)
+        logging.info(err)
     finally:
-        APP.driver.quit()
-    """
-    main()
+        clean_exit()

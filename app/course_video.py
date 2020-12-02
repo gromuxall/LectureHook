@@ -1,14 +1,13 @@
 import os
-import errno
-import concurrent.futures
-from simple_term_menu import TerminalMenu
+import logging
+
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import NoSuchElementException
 from enum import Enum
 import calendar as cal
 
 from app import App
-from task import Task
+
 from waits import elements_with_xpath, elements_by_length
 from js import CLICK_ALL_FUNC, CLICK_ALL_BTNS, CLICK_ALL_LINKS, FILTER_LIST_FUNC
 
@@ -66,28 +65,17 @@ class Course:
         splits = string.get_attribute('value').split(' || ')
         code = splits[0]
         quality = splits[2]
-        print('LINK: {}'.format(link.format(code, quality)))
         return link.format(code, quality)
         
 
     # <Course> ------------------------------------------------------------- //
     @staticmethod
     def check_dir(dir_path):
-        '''Check if directory exists
-
-        True:
-           changes directory to chosen passed-in path
-
-        False:
-            creates directory and changes to it
-        '''
+        '''Creates directory if nonexistent'''
         try:
             os.mkdir(dir_path)
-            #os.chdir(dir_path)
         except IOError as err:
             pass
-            #if err.errno == errno.EEXIST:
-            #    os.chdir(dir_path)
 
     # <Course> ------------------------------------------------------------- //
     def short_name(self):
@@ -145,7 +133,7 @@ class Course:
                     idx))
             except NoSuchElementException:
                 pass
-                #LOGGER.info('Element not found')
+                logging.info('Element not found')
 
         num_lecs = len(self.lectures)
 
@@ -163,37 +151,6 @@ class Course:
         selects = wait.until(elements_by_length(
             "//select[@name='video-one-files']", num_lecs))
         self.extract_links(selects)
-
-        vid_names = [v.date for v in self.lectures]
-        vid_names.insert(0, 'All Lectures')
-
-        lec_choice = TerminalMenu(menu_entries=vid_names,
-                                  title=self.long_name()).show()
-
-        qty_choice = TerminalMenu(menu_entries=['SD', 'HD'],
-                                  title='Quality').show()
-
-        
-        if lec_choice == 0: # Chose 'All Videos'
-            if App.get('multi'):
-                with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=3) as executor:
-                    futures = []
-                    tasks = []
-                    for vid in self.lectures:
-                        tasks.append(Task(vid, qty_choice))
-                    for task in tasks:
-                        futures.append(executor.submit(task.download))
-                    for _ in concurrent.futures.as_completed(futures):
-                        #tasks[ret].finish_msg()
-                        pass
-            else:
-                for vid in self.lectures:
-                    Task(vid, qty_choice).download()
-
-        else:
-            Task(self.lectures[lec_choice-1], qty_choice).download()
-
 
 
 class Quality(Enum):
@@ -225,6 +182,11 @@ class Video(Course):
     def url(self, num):
         '''Return link for specified quality'''
         return self.links[Quality(num).name]
+
+    # <Video> -------------------------------------------------------------- //
+    def mark_dwn(self):
+        '''Return title and checkmark'''
+        self.date = '✓ - ' + self.date
 
     # <Video> -------------------------------------------------------------- //
     def get_date(self):

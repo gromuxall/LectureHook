@@ -1,20 +1,27 @@
 from tqdm import tqdm
+#from progress.bar import Bar
 
 class Task():
     '''Object for initializing progress bar for downloads and performing
     the download upon call
     '''
-    def __init__(self, vid, quality):
+    def __init__(self, vid, quality, multi=None):
         self.vid = vid
         self.path = vid.course.dir_path()
         self.url = vid.url(quality)
         self.length = vid.get_content_len(quality)
         text = 'lec{}.mp4'.format(str(vid.index).zfill(2))
-        self.pbar = tqdm(
-            total=int(int(self.length)/8192), initial=0, position=vid.index,
-            desc=text, leave=False, ncols=90,
-            bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
-        self.pbar.update(0)
+        if multi:
+            self.pbar = tqdm(
+                total=int(int(self.length)/8192), initial=0, position=vid.index,
+                desc=text, leave=False, ncols=90,
+                bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+            self.pbar.update(0)
+        else:
+            self.pbar = tqdm(
+                total=int(int(self.length)/8192), desc=text, leave=True, ncols=90,
+                bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+            self.pbar.update(0)
 
     # <Task> --------------------------------------------------------------- //
     def finish_msg(self):

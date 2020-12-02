@@ -21,7 +21,7 @@ class App:
         'email': None,
         'password': None,
         'multi': False, # multithreading turned off by default
-        'headless': False,
+        'headless': True,
         'driver_path': None,
         'download_path': '../Lectures',
         'url': 'https://echo360.org/courses',
@@ -167,8 +167,6 @@ class App:
     @staticmethod
     def get(name):
         return App._config[name]
-
-    
 
     '''
     # <App> ---------------------------------------------------------------- //
