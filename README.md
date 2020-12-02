@@ -2,7 +2,7 @@
 
 LectureHook is a command-line tool to download lecture videos from the echo360 cloud platform. If you can access your university's lecture videos from echo360.org, you should be able to use this program.
 
-**<< Insert video here >>**  
+![in_use](https://github.com/gromuxall/imagehosting/raw/master/action.gif)  
 
 # Table of Contents
 - [Requirements](#requirements)
