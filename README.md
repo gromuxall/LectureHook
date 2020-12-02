@@ -1,89 +1,52 @@
-<p align="center">
-  <img src="https://github.com/gromuxall/imagehosting/blob/master/lecturehooklogo.png">
-</p>
+<h1>LectureHook<img height="50" align="right" src="https://raw.githubusercontent.com/gromuxall/imagehosting/master/coursehook_badge_1.svg"></h1>
 
----
+LectureHook is a command-line tool to download lecture videos from the echo360 cloud platform. If you can access your university's lecture videos from echo360.org, you should be able to use this program.
 
-LectureHook automates a Chrome browser to navigate to and download all of the lecture captures for a specified course. It is run at the command line and will require an input.
+**<< Insert video here >>**  
 
-This script will check the folder specified in the config file for the number of lectures already present and only download the remaining amount, so it is a good idea to keep them in their own folder.
+# Table of Contents
+- [Requirements](#requirements)
+- [Installation](#installation)
+    - [Linux/MacOS](##linux/macos)
+    - [Windows](##windows)
+    - [Manual](##manual)
+- [Usage](#usage)
 
-## Installation
+# Requirements
+- Python3
+- Google Chrome browser
 
-**Dependencies**
-- Python version 3.4 or later
-- Chrome browser
 
-- Chrome WebDriver for your version of Chrome
+# Installation
 
-    + [Download it here](https://chromedriver.chromium.org/downloads)
-    + extract and move chromedriver to a permanent location
+## Linux/MacOS
+Clone the repo and run the provided install script:  
+`git clone 'https://github.com/gromuxall/LectureHook.git' && chmod 755 LectureHook/app/install.sh && LectureHook/app/install.sh && source ~/.bashrc`  
 
-- Selenium
-    
-    Install Selenium through the pip package manager
-    ```sh
-    $ pip install selenium
-    ```
+Now run in your terminal with command:  
+`lecturehook`
 
-## Usage
-1. Fill out included config file. 
-    ```sh
-    [SITE]
-    site = https://uic.blackboard.com
+## Windows
+A batch script is in the works, but in the meantime you can install manually with the instructions below
 
-    [LOGIN]
-    userid = netid3
-    pass = fakepassword23
+## Manual
+The scripts above will automate the installation inside of a python virtual environment, as well as adding an alias for the program so you can just run it with the command `lecturehook`, but you can install it using the global python environment as well (currently the only option for Windows users). Navigate to the /app folder inside the installation and install the dependencies:  
+`pip3 install -r requirements.txt`  
 
-    [PATHS]
-    driver = /home/full/path/to/chromedriver
-    dwn1 = /home/full/path/to/course1/lectures
-    dwn2 = /home/full/path/to/course2/lectures
-    ...
-    
-    [CODE]
-    code1 = CS
-    code2 = BIOE
-    ...
+Now (while still inside of /app directory) run with:  
+`python3 lhook_app.py`
 
-    [NUM]
-    num1 = 341
-    num2 = 112
-    ...
+# Usage
+LectureHook is interactive via the command line and will fill in the appropriate fields of the configuration file, however, some options can be configured by opening the `config.yaml` file with a text editor and changing some values:
 
-    [TIME]
-    time1 = 
-    time2 = 11am
-    ...
-    ```
-2. Make lecturehook.py executable
-    ```sh
-    $ chmod +x lecturehook.py
-    ```
-3. Run in your terminal
-    ```sh
-    $ python3 lecturehook.py
-    ```
+**Download Directory**  
+Videos will download to a folder named `\Lectures` in the LectureHook directory by default, but you can enter your own path by replacing the value:  
+`download_path: ~\your\chosen\path`
 
-## FAQ
-- Will this work on Windows?
+**Multithreading**  
+Turn on multithreading for batch downloading:  
+`multi: True`
 
-    Yes, although I am unsure as to whether you need to make it executable.
-    
-- Will this work on Mac?
-
-    Yes.
-    
-- Will this work on Linux?
-
-    Yes.
-
-- Will this work for a different school?
-
-    I don't know.
-
-- Why have you been doing this instead of your homework that is due soon?
-
-    I don't know.
-    
+**Headless**  
+If you want to see the browser in action for some reason:  
+`headless: True`
