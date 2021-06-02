@@ -13,4 +13,4 @@ simple-term-menu==0.10.1
 six==1.15.0
 tldextract==2.2.3
 tqdm==4.49.0
-urllib3==1.25.10
+urllib3==1.26.5
